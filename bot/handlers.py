@@ -159,26 +159,50 @@ async def send_or_edit_message(message: Message, text: str, reply_markup: Inline
             pass
         return await message.answer(text, reply_markup=reply_markup, parse_mode=parse_mode)
 
-async def build_welcome_text(user_id: int, bot_username: str = BOT_USERNAME) -> str:
-    """Builds the exact welcome card matching the design in user screenshot"""
-    profile = await get_user_profile(user_id)
-    username_display = f"@{profile['username']}" if profile['username'] else "None"
+async def get_welcome_banner():
+    custom_banner = await get_setting("welcome_banner_url")
+    if custom_banner and custom_banner.strip():
+        return custom_banner.strip()
+    
+    local_banner = Path(__file__).resolve().parent.parent / "foxzen_banner.jpg"
+    if local_banner.exists():
+        return str(local_banner)
+        
+    local_logo = Path(__file__).resolve().parent.parent / "logo.jpg"
+    if local_logo.exists():
+        return str(local_logo)
+        
+    return None
+
+async def build_welcome_text(user_id: int, bot_username: str = BOT_USERNAME, profile: dict = None) -> str:
+    """Builds the exact welcome card matching the design in user screenshot (Image 1)"""
+    if profile is None:
+        profile = await get_user_profile(user_id)
+        
+    username_display = f"@{profile['username']}" if profile.get('username') else "None"
+    first_name = profile.get('first_name') or "User"
+    uid = profile.get('telegram_id') or user_id
+    membership = profile.get('membership') or "🥉 Bronze · 0% off"
+    if "·" not in membership:
+        if "Gold" in membership:
+            membership = "🥇 Gold · 5% off"
+        elif "Silver" in membership:
+            membership = "🥈 Silver · 2% off"
+        else:
+            membership = "🥉 Bronze · 0% off"
+            
+    balance = float(profile.get('balance') or 0.0)
+    total_spent = float(profile.get('total_spent') or 0.0)
     
     text = (
-        "🅵 🅾 🆇 🆉 🅴 🅽\n\n"
-        f"👋 Welcome back, <b>{profile['first_name']}</b>!\n"
-        "<i>Quality products at cheapest rates</i>\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🏷️ Username: {username_display}\n"
-        f"🆔 UserID: <code>{profile['telegram_id']}</code>\n"
-        f"👑 Membership: {profile['membership']}\n"
-        f"💰 Balance: ${profile['balance']:.2f}\n"
-        f"💎 Total Spent: ${profile['total_spent']:.2f}\n"
-        f"🤝 Referrals: {profile['referrals_count']}\n"
-        f"💸 Referral Earning: ${profile['referral_earnings']:.2f}\n"
-        f"🔗 Referral Link: https://t.me/{bot_username}?start=ref_{profile['telegram_id']}\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "<i>Choose an option below to get started.</i>"
+        f"👋 <b>Welcome back, {html.escape(first_name)}</b>\n\n"
+        f"<code>@ Username          </code><code>{username_display}</code>\n"
+        f"<code>👤 User ID           </code><code>{uid}</code>\n"
+        f"<code>💳 Membership        </code><b>{membership}</b>\n"
+        f"<code>💼 Balance           </code><code>${balance:.2f}</code>\n"
+        f"<code>💰 Total spent       </code><code>${total_spent:.2f}</code>\n\n"
+        f"<i>Tap any value to copy it.</i>\n\n"
+        f"🚀 <i>Pick an option below to get started</i>"
     )
     return text
 
@@ -224,16 +248,32 @@ async def handle_start(message: Message, state: FSMContext):
 
     await save_or_update_user(user.id, user.username, user.first_name, referred_by=referred_by)
     
-    # Get bot username if available
     bot_info = await message.bot.get_me()
     bot_username = bot_info.username or BOT_USERNAME
     
-    welcome_text = await build_welcome_text(user.id, bot_username)
+    profile = await get_user_profile(user.id)
+    welcome_text = await build_welcome_text(user.id, bot_username, profile=profile)
     channel_link = await get_setting("channel_link", "https://t.me/Foxzenreseller") or "https://t.me/Foxzenreseller"
+    website_link = await get_setting("website_url", "https://foxzen.co") or "https://foxzen.co"
+    kb = main_inline_menu(user_id=user.id, bot_username=bot_username, channel_url=channel_link, website_url=website_link)
+
+    banner = await get_welcome_banner()
+    if banner:
+        try:
+            if isinstance(banner, str) and (banner.startswith("http://") or banner.startswith("https://")):
+                await message.answer_photo(photo=banner, caption=welcome_text, reply_markup=kb, parse_mode="HTML")
+            elif isinstance(banner, str) and os.path.exists(banner):
+                await message.answer_photo(photo=FSInputFile(banner), caption=welcome_text, reply_markup=kb, parse_mode="HTML")
+            else:
+                await message.answer_photo(photo=banner, caption=welcome_text, reply_markup=kb, parse_mode="HTML")
+            return
+        except Exception as e:
+            logger.warning(f"Error sending welcome banner photo: {e}")
 
     await message.answer(
         text=welcome_text,
-        reply_markup=main_inline_menu(channel_url=channel_link)
+        reply_markup=kb,
+        parse_mode="HTML"
     )
 
 # --- Reply Keyboard Text & Command Triggers ---
@@ -372,9 +412,31 @@ async def cb_home(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     bot_info = await callback.bot.get_me()
     bot_username = bot_info.username or BOT_USERNAME
-    welcome_text = await build_welcome_text(callback.from_user.id, bot_username)
+    profile = await get_user_profile(callback.from_user.id)
+    welcome_text = await build_welcome_text(callback.from_user.id, bot_username, profile=profile)
     channel_link = await get_setting("channel_link", "https://t.me/Foxzenreseller") or "https://t.me/Foxzenreseller"
-    await send_or_edit_message(callback.message, welcome_text, reply_markup=main_inline_menu(channel_url=channel_link))
+    website_link = await get_setting("website_url", "https://foxzen.co") or "https://foxzen.co"
+    kb = main_inline_menu(user_id=callback.from_user.id, bot_username=bot_username, channel_url=channel_link, website_url=website_link)
+    
+    banner = await get_welcome_banner()
+    if banner:
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
+        try:
+            if isinstance(banner, str) and (banner.startswith("http://") or banner.startswith("https://")):
+                await callback.message.answer_photo(photo=banner, caption=welcome_text, reply_markup=kb, parse_mode="HTML")
+            elif isinstance(banner, str) and os.path.exists(banner):
+                await callback.message.answer_photo(photo=FSInputFile(banner), caption=welcome_text, reply_markup=kb, parse_mode="HTML")
+            else:
+                await callback.message.answer_photo(photo=banner, caption=welcome_text, reply_markup=kb, parse_mode="HTML")
+            await callback.answer()
+            return
+        except Exception as e:
+            logger.warning(f"Error sending welcome banner photo in cb_home: {e}")
+            
+    await send_or_edit_message(callback.message, welcome_text, reply_markup=kb)
     await callback.answer()
 
 @router.callback_query(F.data == "nav_products")
@@ -585,14 +647,59 @@ async def cb_clearchat(callback: CallbackQuery, state: FSMContext):
     
     bot_info = await callback.bot.get_me()
     bot_username = bot_info.username or BOT_USERNAME
-    welcome_text = await build_welcome_text(callback.from_user.id, bot_username)
+    profile = await get_user_profile(callback.from_user.id)
+    welcome_text = await build_welcome_text(callback.from_user.id, bot_username, profile=profile)
     channel_link = await get_setting("channel_link", "https://t.me/Foxzenreseller") or "https://t.me/Foxzenreseller"
+    website_link = await get_setting("website_url", "https://foxzen.co") or "https://foxzen.co"
+    kb = main_inline_menu(user_id=callback.from_user.id, bot_username=bot_username, channel_url=channel_link, website_url=website_link)
     
+    banner = await get_welcome_banner()
+    if banner:
+        try:
+            if isinstance(banner, str) and (banner.startswith("http://") or banner.startswith("https://")):
+                await callback.message.answer_photo(photo=banner, caption=welcome_text, reply_markup=kb, parse_mode="HTML")
+            elif isinstance(banner, str) and os.path.exists(banner):
+                await callback.message.answer_photo(photo=FSInputFile(banner), caption=welcome_text, reply_markup=kb, parse_mode="HTML")
+            else:
+                await callback.message.answer_photo(photo=banner, caption=welcome_text, reply_markup=kb, parse_mode="HTML")
+            await callback.answer("Chat refreshed!")
+            return
+        except Exception:
+            pass
+            
     await callback.message.answer(
         text=welcome_text,
-        reply_markup=main_inline_menu(channel_url=channel_link)
+        reply_markup=kb,
+        parse_mode="HTML"
     )
     await callback.answer("Chat refreshed!")
+
+@router.callback_query(F.data == "nav_vendor")
+async def cb_vendor(callback: CallbackQuery):
+    support_link = await get_setting("support_link", "@foxzen_Digital") or "@foxzen_Digital"
+    support_username = support_link.replace("@", "").strip()
+    support_url = f"https://t.me/{support_username}" if not support_link.startswith("http") else support_link
+    
+    text = (
+        "💎 <b>Become a Foxzen Vendor / Supplier</b>\n\n"
+        "Do you sell premium digital products, bulk accounts, or API keys?\n"
+        "Partner with Foxzen Store to reach thousands of verified crypto buyers!\n\n"
+        "✨ <b>Vendor Benefits:</b>\n"
+        "• Automated instant USDT payouts to your Binance Pay / Wallet\n"
+        "• 0% listing fee & guaranteed high volume sales\n"
+        "• Supplier API connection or instant manual stock upload\n"
+        "• 24/7 dedicated merchant priority support\n\n"
+        "👇 <i>Tap below to discuss wholesale listing with our management team:</i>"
+    )
+    buttons = [
+        [InlineKeyboardButton(text=f"💬 Contact Merchant Team ({support_link})", url=support_url, style="success")],
+        [
+            InlineKeyboardButton(text="⬅️ Back", callback_data="nav_home"),
+            InlineKeyboardButton(text="🏠 Main Menu", callback_data="nav_home")
+        ]
+    ]
+    await send_or_edit_message(callback.message, text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+    await callback.answer()
 
 # --- Product Browsing ---
 @router.callback_query(F.data == "cat_all")

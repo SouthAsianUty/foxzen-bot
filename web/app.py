@@ -569,6 +569,7 @@ async def update_settings_action(
     admin_telegram_id: str = Form(""),
     support_link: str = Form(""),
     welcome_message: str = Form(""),
+    welcome_banner_url: str = Form(""),
     admin_username: str = Form("admin"),
     new_password: str = Form(""),
     admin: str = Depends(get_current_admin)
@@ -581,6 +582,7 @@ async def update_settings_action(
         "admin_telegram_id": admin_telegram_id.strip(),
         "support_link": support_link.strip(),
         "welcome_message": welcome_message.strip(),
+        "welcome_banner_url": welcome_banner_url.strip(),
         "admin_username": admin_username.strip()
     }
     

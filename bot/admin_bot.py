@@ -120,6 +120,9 @@ def admin_main_menu_keyboard() -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton(text="💳 Binance Pay API", callback_data="adm_binance_menu"),
+            InlineKeyboardButton(text="🖼️ Set Welcome Banner", callback_data="adm_set_welcome_banner")
+        ],
+        [
             InlineKeyboardButton(text="🔄 Refresh", callback_data="adm_refresh")
         ]
     ])
@@ -605,6 +608,9 @@ class AddStockStates(StatesGroup):
 
 class AdminProductImageState(StatesGroup):
     waiting_for_image = State()
+
+class AdminWelcomeBannerState(StatesGroup):
+    waiting_for_banner = State()
 
 SUPPLIER_CATALOG_CACHE: dict[int, list[dict]] = {}
 
@@ -1309,6 +1315,64 @@ async def process_product_image_text(message: Message, state: FSMContext):
         "⚠️ Please send a <b>photo</b>, or a valid <b>https:// image URL</b>, or type <code>/remove</code> or <code>/cancel</code>.",
         parse_mode=ParseMode.HTML
     )
+
+# --- Welcome Banner Management ---
+@admin_router.message(Command("setbanner"))
+@admin_router.callback_query(F.data == "adm_set_welcome_banner")
+async def cb_admin_set_welcome_banner(event: Message | CallbackQuery, state: FSMContext):
+    await state.set_state(AdminWelcomeBannerState.waiting_for_banner)
+    text = (
+        "🖼️ <b>Set Store Welcome Banner (/start)</b>\n\n"
+        "Aap yahan se customer bot ka main Welcome Banner badal sakte hain:\n\n"
+        "1. 📸 <b>Direct Photo bhejein:</b> Telegram chat me koi bhi photo send karein.\n"
+        "2. 🔗 <b>Image URL bhejein:</b> Direct image web link paste karein (https://...).\n"
+        "3. 🗑️ <b>Default Reset:</b> <code>/removebanner</code> likh kar bhejein (Foxzen Fox banner wapas aa jayega).\n"
+        "4. ❌ <b>Cancel:</b> <code>/cancel</code> likhein."
+    )
+    if isinstance(event, CallbackQuery):
+        await event.message.answer(text, parse_mode=ParseMode.HTML)
+        await event.answer()
+    else:
+        await event.answer(text, parse_mode=ParseMode.HTML)
+
+@admin_router.message(Command("removebanner"))
+async def cmd_remove_welcome_banner(message: Message, state: FSMContext):
+    await state.clear()
+    await update_settings({"welcome_banner_url": ""})
+    await message.answer("✅ <b>Welcome banner reset to default Foxzen Fox banner!</b>", parse_mode=ParseMode.HTML)
+
+@admin_router.message(AdminWelcomeBannerState.waiting_for_banner, F.photo)
+async def process_welcome_banner_photo(message: Message, state: FSMContext):
+    await state.clear()
+    photo_file_id = message.photo[-1].file_id
+    await update_settings({"welcome_banner_url": photo_file_id})
+    await message.answer(
+        "✅ <b>Welcome Banner Photo Saved Successfully!</b>\n\n"
+        "Ab customers ko <code>/start</code> aur Main Menu par ye nayi photo dikhegi! 🎉",
+        parse_mode=ParseMode.HTML
+    )
+
+@admin_router.message(AdminWelcomeBannerState.waiting_for_banner, F.text)
+async def process_welcome_banner_text(message: Message, state: FSMContext):
+    text = message.text.strip()
+    if text.lower() == "/cancel":
+        await state.clear()
+        await message.answer("❌ Cancelled.", parse_mode=ParseMode.HTML)
+        return
+    if text.lower() == "/removebanner":
+        await state.clear()
+        await update_settings({"welcome_banner_url": ""})
+        await message.answer("✅ <b>Welcome banner reset to default Foxzen Fox banner!</b>", parse_mode=ParseMode.HTML)
+        return
+    if text.startswith("http://") or text.startswith("https://"):
+        await state.clear()
+        await update_settings({"welcome_banner_url": text})
+        await message.answer(
+            f"✅ <b>Welcome Banner URL Saved!</b>\n\nURL: <code>{text}</code>\nAb sabhi customers ko /start par ye banner dikhega!",
+            parse_mode=ParseMode.HTML
+        )
+        return
+    await message.answer("⚠️ Please send a <b>photo</b>, or an <b>https:// image URL</b>, or type <code>/cancel</code>.", parse_mode=ParseMode.HTML)
 
 @admin_router.callback_query(F.data.startswith("adm_del_prod_confirm:"))
 async def cb_del_prod_confirm(callback: CallbackQuery):

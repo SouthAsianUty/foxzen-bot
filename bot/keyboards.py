@@ -9,33 +9,41 @@ def main_reply_keyboard():
     ]
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
-def main_inline_menu(trials_url: str = "https://t.me/Foxzenreseller", channel_url: str = None):
-    """Colourful menu matching user UI with native primary, success, and danger styles"""
+def main_inline_menu(user_id: int = None, bot_username: str = "foxzen_bot", channel_url: str = None, website_url: str = None, trials_url: str = None):
+    """Sleek colourful Qamify-style start menu matching user uploaded screenshot"""
     target_channel = channel_url or trials_url or "https://t.me/Foxzenreseller"
+    site_url = website_url or "https://foxzen.co"
+    ref_link = f"https://t.me/{bot_username}?start=ref_{user_id}" if user_id else f"https://t.me/{bot_username}"
+    
     keyboard = [
-        # Row 1: Full width SHOP button (Blue / Primary)
+        # Top Row matching Image 1: [ 📋 Copy invite link ] [ 🌐 Open Foxzen.co ]
+        [
+            InlineKeyboardButton(text="📋 Copy invite link", copy_text=CopyTextButton(text=ref_link)),
+            InlineKeyboardButton(text="🌐 Open Foxzen.co", url=site_url)
+        ],
+        # Full width Green button: [ 🛍️ BUY ON WEBSITE ↗ ]
+        [
+            InlineKeyboardButton(text="🛍️ BUY ON WEBSITE ↗", url=site_url, style="success")
+        ],
+        # Full width Gold/Yellow button: [ 🛍️ SHOP ]
         [
             InlineKeyboardButton(text="🛍️ SHOP", callback_data="nav_products", style="primary")
         ],
-        # Row 2: 3 buttons (Wallet=Green, Freebies=Blue, Profile=Green)
+        # Row 3: [ 💱 Wallet ] [ 🎉 Freebies ] [ 😃 Profile ]
         [
-            InlineKeyboardButton(text="👛 Wallet", callback_data="nav_wallet", style="success"),
-            InlineKeyboardButton(text="🎁 Freebies", callback_data="nav_freebies", style="primary"),
-            InlineKeyboardButton(text="😃 Profile", callback_data="nav_profile", style="success")
+            InlineKeyboardButton(text="💱 Wallet", callback_data="nav_wallet", style="primary"),
+            InlineKeyboardButton(text="🎉 Freebies", callback_data="nav_freebies", style="primary"),
+            InlineKeyboardButton(text="😃 Profile", callback_data="nav_profile", style="primary")
         ],
-        # Row 3: Purchase History (Blue / Primary)
+        # Row 4: [ 🎧 Support ] [ 🗂️ Reseller API ] [ 🗑️ Clear Chat ]
         [
-            InlineKeyboardButton(text="📦 Purchase History", callback_data="nav_my_orders", style="primary")
+            InlineKeyboardButton(text="🎧 Support", callback_data="nav_support", style="primary"),
+            InlineKeyboardButton(text="🗂️ Reseller API", callback_data="nav_reseller", style="primary"),
+            InlineKeyboardButton(text="🗑️ Clear Chat", callback_data="nav_clearchat", style="danger")
         ],
-        # Row 4: Support=Green, Help=Blue, Channel=Green
+        # Row 5: [ 💎 Become Our Vendor ]
         [
-            InlineKeyboardButton(text="🎧 Support", callback_data="nav_support", style="success"),
-            InlineKeyboardButton(text="❓ Help", callback_data="nav_help", style="primary"),
-            InlineKeyboardButton(text="📢 Channel ↗️", url=target_channel, style="success")
-        ],
-        # Row 5: Clear Chat=Red
-        [
-            InlineKeyboardButton(text="🧹 Clear Chat", callback_data="nav_clearchat", style="danger")
+            InlineKeyboardButton(text="💎 Become Our Vendor", callback_data="nav_vendor", style="primary")
         ]
     ]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
