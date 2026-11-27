@@ -4,6 +4,7 @@ from typing import Optional
 from aiogram import Bot, Dispatcher, Router, F, BaseMiddleware
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
+from aiogram.filters import CommandStart, Command
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
@@ -50,27 +51,55 @@ admin_bot: Optional[Bot] = None
 admin_dp: Optional[Dispatcher] = None
 admin_router = Router()
 
-# Whitelist Guard: Only this Telegram ID can interact with the Admin Bot
+# Whitelist Guard: Only authorized Telegram IDs can interact with the Admin Bot
 ALLOWED_ADMIN_IDS = set()
 if ADMIN_TELEGRAM_ID and ADMIN_TELEGRAM_ID.strip():
-    try:
-        ALLOWED_ADMIN_IDS.add(int(ADMIN_TELEGRAM_ID.strip()))
-    except ValueError:
-        pass
-# Default user ID
+    for part in ADMIN_TELEGRAM_ID.split(","):
+        try:
+            if part.strip():
+                ALLOWED_ADMIN_IDS.add(int(part.strip()))
+        except ValueError:
+            pass
+# Default authorized user IDs (owner accounts)
 ALLOWED_ADMIN_IDS.add(6443134339)
+ALLOWED_ADMIN_IDS.add(8835040690)
 
-def is_admin(user_id: int) -> bool:
-    return user_id in ALLOWED_ADMIN_IDS
+async def is_admin(user_id: int) -> bool:
+    if user_id in ALLOWED_ADMIN_IDS:
+        return True
+    try:
+        db_admin = await get_setting("admin_telegram_id")
+        if db_admin:
+            for part in str(db_admin).split(","):
+                part_clean = part.strip()
+                if part_clean and int(part_clean) == user_id:
+                    ALLOWED_ADMIN_IDS.add(user_id)
+                    return True
+    except Exception:
+        pass
+    return False
 
 # --- Security Filter Middleware ---
 class AdminWhitelistMiddleware(BaseMiddleware):
     async def __call__(self, handler, event, data):
         user = getattr(event, "from_user", None)
-        if not user or not is_admin(user.id):
-            logger.warning(f"Unauthorized access to Admin Bot from user: {user.id if user else 'unknown'}")
+        if not user:
+            return None
+        
+        authorized = await is_admin(user.id)
+        if not authorized:
+            logger.warning(f"Unauthorized access attempt to Admin Bot from user: {user.id} (@{user.username})")
             if isinstance(event, CallbackQuery):
                 await event.answer("⛔ Access Denied: Private Admin Bot.", show_alert=True)
+            elif isinstance(event, Message):
+                await event.answer(
+                    f"⛔ <b>Access Denied: Private Master Admin Bot</b>\n\n"
+                    f"🆔 <b>Your Telegram ID:</b> <code>{user.id}</code>\n"
+                    f"👤 <b>Username:</b> @{user.username or 'None'}\n\n"
+                    f"This bot is private and restricted strictly to store administrators.\n\n"
+                    f"👉 If you are the owner, add your Telegram ID <code>{user.id}</code> in Railway Variables (<code>ADMIN_TELEGRAM_ID</code>) or Web Dashboard Settings to activate access!",
+                    parse_mode=ParseMode.HTML
+                )
             return None
         return await handler(event, data)
 
@@ -129,6 +158,8 @@ async def render_admin_dashboard_text() -> str:
     )
 
 # --- Commands ---
+@admin_router.message(CommandStart())
+@admin_router.message(Command("start", "menu", "admin"))
 @admin_router.message(F.text == "/start")
 @admin_router.message(F.text == "/menu")
 @admin_router.message(F.text == "/admin")
@@ -147,6 +178,7 @@ async def cb_admin_menu(callback: CallbackQuery):
     await callback.answer("Dashboard updated!")
 
 # --- 1. Analytics & Stats ---
+@admin_router.message(Command("stats"))
 @admin_router.message(F.text == "/stats")
 async def cmd_admin_stats_msg(message: Message):
     stats = await get_dashboard_stats()
@@ -193,6 +225,7 @@ async def cb_admin_stats(callback: CallbackQuery):
     await callback.answer()
 
 # --- 2. Orders Manager ---
+@admin_router.message(Command("orders"))
 @admin_router.message(F.text == "/orders")
 async def cmd_admin_orders_msg(message: Message):
     orders = await get_all_orders(limit=8)
@@ -358,6 +391,7 @@ async def cb_admin_reject_order(callback: CallbackQuery):
     await cb_admin_order_detail(callback)
 
 # --- 3. Supplier Balance ---
+@admin_router.message(Command("supplier"))
 @admin_router.message(F.text == "/supplier")
 async def cmd_admin_supplier_msg(message: Message):
     providers = await get_providers()
@@ -442,6 +476,7 @@ async def render_binance_status_text() -> str:
         )
     return text
 
+@admin_router.message(Command("binance"))
 @admin_router.message(F.text == "/binance")
 async def cmd_admin_binance(message: Message):
     text = await render_binance_status_text()
@@ -574,6 +609,7 @@ class AdminProductImageState(StatesGroup):
 SUPPLIER_CATALOG_CACHE: dict[int, list[dict]] = {}
 
 # --- Cancel Active Action ---
+@admin_router.message(Command("cancel"))
 @admin_router.message(F.text == "/cancel")
 @admin_router.callback_query(F.data == "adm_cancel_fsm")
 async def cb_cancel_fsm(event: Message | CallbackQuery, state: FSMContext):
@@ -620,6 +656,7 @@ def products_menu_keyboard() -> InlineKeyboardMarkup:
         ]
     ])
 
+@admin_router.message(Command("products"))
 @admin_router.message(F.text == "/products")
 async def cmd_admin_products_msg(message: Message, state: FSMContext):
     await state.clear()
@@ -1309,6 +1346,7 @@ async def cb_noop(callback: CallbackQuery):
     await callback.answer()
 
 # --- 5. Users & Wallets ---
+@admin_router.message(Command("users"))
 @admin_router.message(F.text == "/users")
 async def cmd_admin_users_msg(message: Message):
     users = await get_all_users()

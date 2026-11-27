@@ -89,7 +89,7 @@ async def start_admin_bot_service():
         if adm_bot:
             await adm_bot.session.close()
 
-    token = ADMIN_BOT_TOKEN
+    token = (await get_setting("admin_bot_token", "")).strip() or ADMIN_BOT_TOKEN or "9088050558:AAEpzubiyrQWFUMOGiHGc1iJD1JqdV21G5A"
     if not token or not token.strip():
         logger.info("Admin Bot Token is not set. Dedicated Admin Bot is disabled.")
         return

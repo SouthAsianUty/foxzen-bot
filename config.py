@@ -9,9 +9,9 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 # App configurations
-BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
-ADMIN_BOT_TOKEN = os.getenv("ADMIN_BOT_TOKEN", "").strip()
-ADMIN_TELEGRAM_ID = os.getenv("ADMIN_TELEGRAM_ID", "").strip()
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8444936570:AAHPhqLVDQuhTYohxasvJoXHLBguMrEGecY").strip()
+ADMIN_BOT_TOKEN = os.getenv("ADMIN_BOT_TOKEN", "9088050558:AAEpzubiyrQWFUMOGiHGc1iJD1JqdV21G5A").strip()
+ADMIN_TELEGRAM_ID = os.getenv("ADMIN_TELEGRAM_ID", "6443134339").strip()
 
 BINANCE_PAY_ID = os.getenv("BINANCE_PAY_ID", "").strip()
 BINANCE_API_KEY = os.getenv("BINANCE_API_KEY", "").strip()
