@@ -1,7 +1,10 @@
 import random
 import logging
+import os
+import html
+from pathlib import Path
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile, URLInputFile
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -66,6 +69,95 @@ class OrderState(StatesGroup):
     waiting_for_quantity = State()
 
 BOT_USERNAME = "foxzen_bot"
+
+DEFAULT_BRAND_BANNERS = {
+    "nordvpn": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/NordVPN_Logo_2020.svg/1024px-NordVPN_Logo_2020.svg.png",
+    "vpn": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/NordVPN_Logo_2020.svg/1024px-NordVPN_Logo_2020.svg.png",
+    "chatgpt": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/ChatGPT_logo.svg/1024px-ChatGPT_logo.svg.png",
+    "gpt": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/ChatGPT_logo.svg/1024px-ChatGPT_logo.svg.png",
+    "openai": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/OpenAI_Logo.svg/1024px-OpenAI_Logo.svg.png",
+    "canva": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Canva_icon_2021.svg/1024px-Canva_icon_2021.svg.png",
+    "netflix": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Netflix_2015_logo.svg/1024px-Netflix_2015_logo.svg.png",
+    "spotify": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Spotify_logo_without_text.svg/1024px-Spotify_logo_without_text.svg.png",
+    "youtube": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/Youtube_logo.png/1024px-Youtube_logo.png",
+    "prime": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/Amazon_Prime_Video_logo.svg/1024px-Amazon_Prime_Video_logo.svg.png",
+    "telegram": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Telegram_logo.svg/1024px-Telegram_logo.svg.png",
+    "nitro": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/Discord_Nitro_Logo.svg/1024px-Discord_Nitro_Logo.svg.png",
+    "discord": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/Discord_Nitro_Logo.svg/1024px-Discord_Nitro_Logo.svg.png",
+    "office": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Microsoft_Office_logo_%282019%E2%80%93present%29.svg/1024px-Microsoft_Office_logo_%282019%E2%80%93present%29.svg.png",
+    "microsoft": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Microsoft_logo_%282012%29.svg/1024px-Microsoft_logo_%282012%29.svg.png",
+    "365": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Microsoft_Office_logo_%282019%E2%80%93present%29.svg/1024px-Microsoft_Office_logo_%282019%E2%80%93present%29.svg.png",
+    "capcut": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Capcut_logo.svg/1024px-Capcut_logo.svg.png",
+    "gemini": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_Gemini_logo.svg/1024px-Google_Gemini_logo.svg.png",
+    "google": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Google_2015_logo.svg/1024px-Google_2015_logo.svg.png",
+    "claude": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Anthropic_logo.svg/1024px-Anthropic_logo.svg.png",
+    "duolingo": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Duolingo_logo.svg/1024px-Duolingo_logo.svg.png",
+    "linkedin": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/LinkedIn_logo_initials.png/1024px-LinkedIn_logo_initials.png",
+    "crunchyroll": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Crunchyroll_Logo.png/1024px-Crunchyroll_Logo.png",
+    "apple": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/1024px-Apple_logo_black.svg.png",
+    "hotmail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Microsoft_Office_Outlook_%282018%E2%80%93present%29.svg/1024px-Microsoft_Office_Outlook_%282018%E2%80%93present%29.svg.png",
+    "outlook": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Microsoft_Office_Outlook_%282018%E2%80%93present%29.svg/1024px-Microsoft_Office_Outlook_%282018%E2%80%93present%29.svg.png",
+    "mail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Microsoft_Office_Outlook_%282018%E2%80%93present%29.svg/1024px-Microsoft_Office_Outlook_%282018%E2%80%93present%29.svg.png",
+    "adobe": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/Adobe_Corporate_Logo.png/1024px-Adobe_Corporate_Logo.png",
+    "tradingview": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/TradingView_Logo.svg/1024px-TradingView_Logo.svg.png",
+    "copilot": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Microsoft_Copilot_Icon.svg/1024px-Microsoft_Copilot_Icon.svg.png",
+    "muse": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_Gemini_logo.svg/1024px-Google_Gemini_logo.svg.png"
+}
+
+def get_product_banner(product: dict):
+    img = product.get("image_url")
+    if img and img.strip():
+        return img.strip()
+    
+    name_lower = product.get("name", "").lower()
+    for kw, banner_url in DEFAULT_BRAND_BANNERS.items():
+        if kw in name_lower:
+            return banner_url
+            
+    local_logo = Path(__file__).resolve().parent.parent / "logo.jpg"
+    if local_logo.exists():
+        return str(local_logo)
+        
+    return None
+
+def format_qamify_product_caption(p: dict) -> str:
+    in_stock = int(p.get("in_stock", 0))
+    stock_str = f"<code>{in_stock} available</code> (✅ In Stock)" if in_stock > 0 else "❌ <b>Out of Stock</b>"
+    warranty = p.get("delivery_instructions") or "Full Warranty Coverage & Instant Replacement"
+    desc = (p.get("description") or "").strip()
+    cat_name = p.get("category_name") or "General"
+    
+    caption = (
+        f"🏷️ <b>{html.escape(p['name'])}</b>\n"
+        f"📁 Category: <b>{html.escape(cat_name)}</b>\n"
+        f"⚡ <b>Instant Auto-Delivery</b> (24/7 Delivery)\n\n"
+        f"💰 <b>Price:</b> <code>${float(p['price']):.2f} USDT</code>\n"
+        f"📦 <b>Stock:</b> {stock_str}\n"
+        f"🛡️ <b>Warranty:</b> <code>{html.escape(warranty)}</code>\n"
+        f"⏱️ <b>Delivery:</b> <code>Instant (~5-10 sec)</code>\n"
+    )
+    if desc:
+        caption += f"\n━━━━━━━━━━━━━━━━━━━━━━\n📝 <b>Details & Features:</b>\n{html.escape(desc)}\n━━━━━━━━━━━━━━━━━━━━━━\n"
+    else:
+        caption += "\n━━━━━━━━━━━━━━━━━━━━━━\n"
+    caption += "👉 <i>Select a button below to purchase instantly:</i>"
+    return caption
+
+async def send_or_edit_message(message: Message, text: str, reply_markup: InlineKeyboardMarkup = None, parse_mode: str = "HTML") -> Message:
+    try:
+        if message.photo:
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            return await message.answer(text, reply_markup=reply_markup, parse_mode=parse_mode)
+        return await message.edit_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
+    except Exception:
+        try:
+            await message.delete()
+        except Exception:
+            pass
+        return await message.answer(text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 async def build_welcome_text(user_id: int, bot_username: str = BOT_USERNAME) -> str:
     """Builds the exact welcome card matching the design in user screenshot"""
@@ -282,17 +374,7 @@ async def cb_home(callback: CallbackQuery, state: FSMContext):
     bot_username = bot_info.username or BOT_USERNAME
     welcome_text = await build_welcome_text(callback.from_user.id, bot_username)
     channel_link = await get_setting("channel_link", "https://t.me/Foxzenreseller") or "https://t.me/Foxzenreseller"
-    
-    try:
-        await callback.message.edit_text(
-            text=welcome_text,
-            reply_markup=main_inline_menu(channel_url=channel_link)
-        )
-    except Exception:
-        await callback.message.answer(
-            text=welcome_text,
-            reply_markup=main_inline_menu(channel_url=channel_link)
-        )
+    await send_or_edit_message(callback.message, welcome_text, reply_markup=main_inline_menu(channel_url=channel_link))
     await callback.answer()
 
 @router.callback_query(F.data == "nav_products")
@@ -303,7 +385,7 @@ async def cb_products(callback: CallbackQuery):
         "• <b>🛒 View All Products:</b> View all items in 1-tap\n"
         "• <b>📂 Categories Wise:</b> Browse items organized by category"
     )
-    await callback.message.edit_text(text, reply_markup=shop_menu_keyboard())
+    await send_or_edit_message(callback.message, text, reply_markup=shop_menu_keyboard())
     await callback.answer()
 
 @router.callback_query(F.data == "nav_categories")
@@ -312,7 +394,7 @@ async def cb_categories(callback: CallbackQuery):
     uncat_products = await get_products(category_id=0, active_only=True)
     if not cats and not uncat_products:
         products = await get_products(active_only=True)
-        await callback.message.edit_text("🛒 <b>Available Products:</b>", reply_markup=products_keyboard(products))
+        await send_or_edit_message(callback.message, "🛒 <b>Available Products:</b>", reply_markup=products_keyboard(products))
         await callback.answer()
         return
 
@@ -320,7 +402,7 @@ async def cb_categories(callback: CallbackQuery):
         "📂 <b>Product Categories</b>\n\n"
         "Select a category below to view products with instant delivery:"
     )
-    await callback.message.edit_text(text, reply_markup=categories_keyboard(cats, has_uncategorized=bool(uncat_products)))
+    await send_or_edit_message(callback.message, text, reply_markup=categories_keyboard(cats, has_uncategorized=bool(uncat_products)))
     await callback.answer()
 
 @router.callback_query(F.data == "nav_wallet")
@@ -333,7 +415,7 @@ async def cb_wallet(callback: CallbackQuery):
         f"👑 Membership Tier: <b>{profile['membership']}</b>\n\n"
         "Pay per order directly via Binance Pay, or top up your wallet balance below:"
     )
-    await callback.message.edit_text(text, reply_markup=wallet_keyboard())
+    await send_or_edit_message(callback.message, text, reply_markup=wallet_keyboard())
     await callback.answer()
 
 @router.callback_query(F.data == "wallet_deposit")
@@ -348,7 +430,7 @@ async def cb_wallet_deposit(callback: CallbackQuery):
         "4. Paste your TxID in this chat or send to 🎧 Support to credit balance!\n\n"
         "👇 <i>Tap the button below to copy Binance ID in 1-tap:</i>"
     )
-    await callback.message.edit_text(text, reply_markup=wallet_deposit_keyboard(pay_id))
+    await send_or_edit_message(callback.message, text, reply_markup=wallet_deposit_keyboard(pay_id))
     await callback.answer()
 
 @router.message(Command("freebies"))
@@ -517,13 +599,13 @@ async def cb_clearchat(callback: CallbackQuery, state: FSMContext):
 async def cb_cat_all(callback: CallbackQuery):
     products = await get_products(active_only=True)
     if not products:
-        await callback.message.edit_text("⚠️ No products available right now.", reply_markup=back_to_home_keyboard())
+        await send_or_edit_message(callback.message, "⚠️ No products available right now.", reply_markup=back_to_home_keyboard())
         return
     text = (
         "🛒 <b>All Available Products:</b>\n\n"
         "Select any product below to view details and purchase with Instant Delivery:"
     )
-    await callback.message.edit_text(text, reply_markup=products_keyboard(products))
+    await send_or_edit_message(callback.message, text, reply_markup=products_keyboard(products))
     await callback.answer()
 
 @router.callback_query(F.data.startswith("cat_"))
@@ -559,7 +641,7 @@ async def cb_category_filter(callback: CallbackQuery):
                 InlineKeyboardButton(text="🏠 Main Menu", callback_data="nav_home")
             ]
         ]
-        await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+        await send_or_edit_message(callback.message, text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
         await callback.answer()
         return
 
@@ -567,7 +649,7 @@ async def cb_category_filter(callback: CallbackQuery):
         f"{cat_icon} <b>{cat_name}</b>\n\n"
         "Select a product below to view details and purchase with Instant Delivery:"
     )
-    await callback.message.edit_text(text, reply_markup=products_keyboard(products, category_name=cat_name))
+    await send_or_edit_message(callback.message, text, reply_markup=products_keyboard(products, category_name=cat_name))
     await callback.answer()
 
 @router.callback_query(F.data.startswith("prod_"))
@@ -578,21 +660,29 @@ async def cb_product_detail(callback: CallbackQuery):
         await callback.answer("Product not found!", show_alert=True)
         return
     
-    stock_status = f"✅ In Stock: <b>{p['in_stock']} available</b>" if p['in_stock'] > 0 else "❌ <b>Currently Out of Stock</b>"
-    desc = p.get('description', '')
-    instructions = p.get('delivery_instructions', '')
+    caption = format_qamify_product_caption(p)
+    kb = product_detail_keyboard(p)
+    banner = get_product_banner(p)
     
-    text = (
-        f"🏷️ <b>{p['name']}</b>\n"
-        f"📁 Category: {p.get('category_name') or 'General'}\n"
-        f"💵 Price: <b>${p['price']} USDT</b>\n"
-        f"{stock_status}\n\n"
-        f"📝 <b>Description:</b>\n{desc}\n\n"
-    )
-    if instructions:
-        text += f"ℹ️ <b>Note / Warranty:</b>\n{instructions}\n"
-        
-    await callback.message.edit_text(text, reply_markup=product_detail_keyboard(p))
+    if banner:
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
+            
+        try:
+            if isinstance(banner, str) and (banner.startswith("http://") or banner.startswith("https://")):
+                await callback.message.answer_photo(photo=banner, caption=caption, reply_markup=kb, parse_mode="HTML")
+            elif isinstance(banner, str) and os.path.exists(banner):
+                await callback.message.answer_photo(photo=FSInputFile(banner), caption=caption, reply_markup=kb, parse_mode="HTML")
+            else:
+                await callback.message.answer_photo(photo=banner, caption=caption, reply_markup=kb, parse_mode="HTML")
+            await callback.answer()
+            return
+        except Exception as e:
+            logger.warning(f"Failed to send product photo banner, falling back to text: {e}")
+            
+    await send_or_edit_message(callback.message, caption, reply_markup=kb)
     await callback.answer()
 
 @router.callback_query(F.data.startswith("out_of_stock_"))
@@ -662,7 +752,7 @@ async def cb_select_quantity_menu(callback: CallbackQuery, state: FSMContext):
     kb = quantity_selection_keyboard(p)
     
     try:
-        await callback.message.edit_text(text, reply_markup=kb)
+        await send_or_edit_message(callback.message, text, reply_markup=kb)
     except Exception:
         pass
     await callback.answer()
@@ -693,7 +783,7 @@ async def cb_pick_quantity(callback: CallbackQuery, state: FSMContext):
     kb = payment_selection_keyboard(p, qty)
     
     try:
-        await callback.message.edit_text(text, reply_markup=kb)
+        await send_or_edit_message(callback.message, text, reply_markup=kb)
     except Exception:
         pass
     await callback.answer()

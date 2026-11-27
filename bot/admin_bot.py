@@ -25,6 +25,7 @@ from database import (
     get_product,
     add_product,
     delete_product,
+    set_product_image,
     get_categories,
     get_category,
     add_stock_items,
@@ -566,6 +567,9 @@ class AddResellerProductStates(StatesGroup):
 
 class AddStockStates(StatesGroup):
     waiting_for_stock_items = State()
+
+class AdminProductImageState(StatesGroup):
+    waiting_for_image = State()
 
 SUPPLIER_CATALOG_CACHE: dict[int, list[dict]] = {}
 
@@ -1164,6 +1168,9 @@ async def cb_prod_detail(callback: CallbackQuery):
     type_str = "🔌 Supplier API (Instant Delivery)" if is_api else "📦 Local Stock (Uploaded Accounts)"
     stock_str = "⚡ Unlimited / Live API Stock" if is_api else f"<b>{prod.get('in_stock', 0)}</b> items available"
     prov_str = f"\n🏢 <b>Supplier:</b> {prod.get('provider_name', 'N/A')} (ID: <code>{prod.get('provider_product_id', 'N/A')}</code>)\n💰 <b>Wholesale Cost:</b> ${prod.get('provider_price', 0.0):.2f} USDT" if is_api else ""
+    
+    has_img = bool(prod.get("image_url") and prod.get("image_url").strip())
+    img_status = "🖼️ <b>Banner:</b> Custom Photo / URL Set ✅" if has_img else "🖼️ <b>Banner:</b> Auto Brand Poster 🎨"
 
     text = (
         f"📦 <b>Product Details: #{prod['id']}</b>\n\n"
@@ -1171,7 +1178,8 @@ async def cb_prod_detail(callback: CallbackQuery):
         f"📁 <b>Category:</b> {prod.get('category_name') or 'General'}\n"
         f"💵 <b>Selling Price:</b> <code>${prod['price']} USDT</code>\n"
         f"🏷️ <b>Fulfillment:</b> {type_str}\n"
-        f"📊 <b>Stock Status:</b> {stock_str}"
+        f"📊 <b>Stock Status:</b> {stock_str}\n"
+        f"{img_status}"
         f"{prov_str}\n\n"
         f"📝 <b>Description:</b>\n<i>{prod.get('description') or 'None'}</i>"
     )
@@ -1180,12 +1188,90 @@ async def cb_prod_detail(callback: CallbackQuery):
     if not is_api:
         buttons.append([InlineKeyboardButton(text="📥 Add Stock Items", callback_data=f"adm_stock_for:{prod['id']}")])
     buttons.append([
+        InlineKeyboardButton(text="🖼️ Set Banner / Photo", callback_data=f"adm_set_img:{prod['id']}")
+    ])
+    buttons.append([
         InlineKeyboardButton(text="🗑️ Delete Product", callback_data=f"adm_del_prod_confirm:{prod['id']}"),
         InlineKeyboardButton(text="🔙 Back to List", callback_data="adm_view_all_prods:0")
     ])
     
     await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode=ParseMode.HTML)
     await callback.answer()
+
+@admin_router.callback_query(F.data.startswith("adm_set_img:"))
+async def cb_admin_set_img(callback: CallbackQuery, state: FSMContext):
+    pid = int(callback.data.replace("adm_set_img:", ""))
+    prod = await get_product(pid)
+    if not prod:
+        await callback.answer("Product not found!", show_alert=True)
+        return
+        
+    await state.set_state(AdminProductImageState.waiting_for_image)
+    await state.update_data(product_id=pid)
+    
+    text = (
+        f"🖼️ <b>Set Product Banner for: {prod['name']} (ID: #{pid})</b>\n\n"
+        "Aap is product ke liye banner image set kar sakte hain:\n\n"
+        "1. 📸 <b>Direct Photo bhejein:</b> Telegram chat me photo/image send karein.\n"
+        "2. 🔗 <b>Image URL bhejein:</b> Direct web link paste karein (https://...).\n"
+        "3. 🗑️ <b>Default par reset karein:</b> <code>/remove</code> likh kar bhejein.\n"
+        "4. ❌ <b>Cancel karein:</b> <code>/cancel</code> likh kar bhejein."
+    )
+    buttons = [
+        [InlineKeyboardButton(text="🔙 Cancel", callback_data=f"adm_prod_detail:{pid}")]
+    ]
+    await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode=ParseMode.HTML)
+    await callback.answer()
+
+@admin_router.message(AdminProductImageState.waiting_for_image, F.photo)
+async def process_product_image_photo(message: Message, state: FSMContext):
+    data = await state.get_data()
+    pid = data.get("product_id")
+    await state.clear()
+    
+    photo_file_id = message.photo[-1].file_id
+    await set_product_image(pid, photo_file_id)
+    prod = await get_product(pid)
+    
+    await message.answer(
+        f"✅ <b>Product Banner Updated Successfully!</b>\n\n"
+        f"Photo saved for <b>{prod['name'] if prod else f'Product #{pid}'}</b>.\n"
+        f"Ab customer bot me is product par ye banner photo dikhegi!",
+        parse_mode=ParseMode.HTML
+    )
+
+@admin_router.message(AdminProductImageState.waiting_for_image, F.text)
+async def process_product_image_text(message: Message, state: FSMContext):
+    text = message.text.strip()
+    data = await state.get_data()
+    pid = data.get("product_id")
+    
+    if text.lower() == "/cancel":
+        await state.clear()
+        await message.answer("❌ Cancelled.", parse_mode=ParseMode.HTML)
+        return
+        
+    if text.lower() == "/remove":
+        await state.clear()
+        await set_product_image(pid, "")
+        await message.answer("✅ <b>Custom image removed.</b> Ab automatic high-resolution brand banner use hoga!", parse_mode=ParseMode.HTML)
+        return
+        
+    if text.startswith("http://") or text.startswith("https://"):
+        await state.clear()
+        await set_product_image(pid, text)
+        prod = await get_product(pid)
+        await message.answer(
+            f"✅ <b>Image URL Saved!</b>\n\n"
+            f"Banner set for <b>{prod['name'] if prod else f'Product #{pid}'}</b>:\n<code>{text}</code>",
+            parse_mode=ParseMode.HTML
+        )
+        return
+        
+    await message.answer(
+        "⚠️ Please send a <b>photo</b>, or a valid <b>https:// image URL</b>, or type <code>/remove</code> or <code>/cancel</code>.",
+        parse_mode=ParseMode.HTML
+    )
 
 @admin_router.callback_query(F.data.startswith("adm_del_prod_confirm:"))
 async def cb_del_prod_confirm(callback: CallbackQuery):

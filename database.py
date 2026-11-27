@@ -457,30 +457,55 @@ async def update_product(
     price: float, 
     delivery_instructions: str, 
     is_active: int,
+    image_url: str = None,
     fulfillment_type: str = "LOCAL",
     provider_id: int = None,
     provider_product_id: str = None,
     provider_price: float = 0.0
 ):
     async with get_db() as db:
-        await db.execute("""
-            UPDATE products SET
-                category_id = ?,
-                name = ?,
-                description = ?,
-                price = ?,
-                delivery_instructions = ?,
-                is_active = ?,
-                fulfillment_type = ?,
-                provider_id = ?,
-                provider_product_id = ?,
-                provider_price = ?
-            WHERE id = ?
-        """, (
-            category_id, name, description, price, delivery_instructions, is_active,
-            fulfillment_type, provider_id, provider_product_id, provider_price, product_id
-        ))
+        if image_url is not None:
+            await db.execute("""
+                UPDATE products SET
+                    category_id = ?,
+                    name = ?,
+                    description = ?,
+                    price = ?,
+                    delivery_instructions = ?,
+                    is_active = ?,
+                    image_url = ?,
+                    fulfillment_type = ?,
+                    provider_id = ?,
+                    provider_product_id = ?,
+                    provider_price = ?
+                WHERE id = ?
+            """, (
+                category_id, name, description, price, delivery_instructions, is_active,
+                image_url, fulfillment_type, provider_id, provider_product_id, provider_price, product_id
+            ))
+        else:
+            await db.execute("""
+                UPDATE products SET
+                    category_id = ?,
+                    name = ?,
+                    description = ?,
+                    price = ?,
+                    delivery_instructions = ?,
+                    is_active = ?,
+                    fulfillment_type = ?,
+                    provider_id = ?,
+                    provider_product_id = ?,
+                    provider_price = ?
+                WHERE id = ?
+            """, (
+                category_id, name, description, price, delivery_instructions, is_active,
+                fulfillment_type, provider_id, provider_product_id, provider_price, product_id
+            ))
         await db.commit()
+
+async def set_product_image(product_id: int, image_url: str):
+    async with get_db() as db:
+        await db.execute("UPDATE products SET image_url = ? WHERE id = ?", (image_url, product_id))
         await db.commit()
 
 async def delete_product(product_id: int):
