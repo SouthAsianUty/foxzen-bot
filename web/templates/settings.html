@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Settings & Binance API - Foxzen Bot Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl space-y-8">
+
+    <div>
+        <h2 class="text-2xl font-bold tracking-tight text-white">System Settings</h2>
+        <p class="text-sm text-slate-400">Configure your Binance Pay details, Telegram Bot token, and Admin credentials.</p>
+    </div>
+
+    <!-- Live Binance API Test Result Banner (AJAX) -->
+    <div id="testResultBanner" class="p-4 rounded-xl hidden"></div>
+
+    <form action="/settings" method="POST" class="space-y-8">
+
+        <!-- 1. Binance Pay & API Settings -->
+        <div class="bg-darkcard border border-darkborder rounded-2xl p-6 shadow-xl space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-lg font-bold">
+                        B
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-white text-base">Binance Pay Configuration</h3>
+                        <p class="text-xs text-slate-400">Settings for receiving crypto payments and verifying TxIDs</p>
+                    </div>
+                </div>
+
+                <button type="button" onclick="testBinanceApi()" id="testBinanceBtn" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center space-x-2">
+                    <i class="fa-solid fa-bolt text-xs"></i>
+                    <span>Test API Connection</span>
+                </button>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    Your Binance Pay ID / Binance UID <span class="text-rose-400">*</span>
+                </label>
+                <input type="text" name="binance_pay_id" value="{{ settings.binance_pay_id or '' }}" required placeholder="e.g. 198273645"
+                    class="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500 font-mono">
+                <p class="text-xs text-slate-500 mt-1">This Pay ID is displayed to customers inside the Telegram bot when they click 'Buy'.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Binance API Key (Optional)</label>
+                    <input type="text" name="binance_api_key" id="api_key_field" value="{{ settings.binance_api_key or '' }}" placeholder="Paste API Key"
+                        class="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-emerald-500">
+                    <p class="text-[11px] text-slate-500 mt-1">For automatic instant payment verification without manual approval.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Binance API Secret (Optional)</label>
+                    <input type="password" name="binance_api_secret" id="api_secret_field" value="{{ settings.binance_api_secret or '' }}" placeholder="Paste Secret Key"
+                        class="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-emerald-500">
+                    <p class="text-[11px] text-slate-500 mt-1">Stored securely and used strictly for HMAC-SHA256 signature verification.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Telegram Bot Settings -->
+        <div class="bg-darkcard border border-darkborder rounded-2xl p-6 shadow-xl space-y-5">
+            <div class="flex items-center space-x-3 pb-4 border-b border-slate-800">
+                <div class="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-lg">
+                    <i class="fa-brands fa-telegram"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-white text-base">Telegram Bot Settings</h3>
+                    <p class="text-xs text-slate-400">Bot token from @BotFather and Admin notifications</p>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    Telegram Bot Token <span class="text-rose-400">*</span>
+                </label>
+                <input type="password" name="telegram_bot_token" value="{{ settings.telegram_bot_token or '' }}" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+                    class="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-emerald-500">
+                <p class="text-xs text-slate-500 mt-1">Get this by creating a bot with @BotFather on Telegram.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Admin Telegram Chat ID</label>
+                    <input type="text" name="admin_telegram_id" value="{{ settings.admin_telegram_id or '' }}" placeholder="e.g. 987654321"
+                        class="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500 font-mono">
+                    <p class="text-xs text-slate-500 mt-1">You will receive real-time alerts whenever a user submits an order.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Customer Support Handle / Link</label>
+                    <input type="text" name="support_link" value="{{ settings.support_link or '@admin' }}" placeholder="@your_support_username"
+                        class="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500">
+                    <p class="text-xs text-slate-500 mt-1">Shown in the bot's 'Support' button.</p>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Bot Welcome Message</label>
+                <textarea name="welcome_message" rows="3"
+                    class="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500">{{ settings.welcome_message or '' }}</textarea>
+            </div>
+        </div>
+
+        <!-- 3. Web Dashboard Admin Password -->
+        <div class="bg-darkcard border border-darkborder rounded-2xl p-6 shadow-xl space-y-5">
+            <div class="flex items-center space-x-3 pb-4 border-b border-slate-800">
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-white text-base">Dashboard Security</h3>
+                    <p class="text-xs text-slate-400">Change Admin login username & password</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Admin Username</label>
+                    <input type="text" name="admin_username" value="{{ settings.admin_username or 'admin' }}" required
+                        class="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">New Password (Leave empty to keep current)</label>
+                    <input type="password" name="new_password" placeholder="••••••••"
+                        class="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Save Button -->
+        <div class="flex justify-end pt-2">
+            <button type="submit" class="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl shadow-lg shadow-emerald-950/50 transition flex items-center space-x-2">
+                <i class="fa-solid fa-floppy-disk text-xs"></i>
+                <span>Save All Settings</span>
+            </button>
+        </div>
+    </form>
+
+</div>
+
+<script>
+    async function testBinanceApi() {
+        const btn = document.getElementById('testBinanceBtn');
+        const banner = document.getElementById('testResultBanner');
+        const apiKey = document.getElementById('api_key_field').value;
+        const apiSecret = document.getElementById('api_secret_field').value;
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> <span>Testing...</span>';
+        banner.className = 'p-4 rounded-xl hidden';
+
+        try {
+            const formData = new FormData();
+            formData.append('api_key', apiKey);
+            formData.append('api_secret', apiSecret);
+
+            const res = await fetch('/settings/test-binance', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+
+            banner.classList.remove('hidden');
+            if (data.success) {
+                banner.className = 'p-4 rounded-xl bg-emerald-950/50 border border-emerald-500/50 text-emerald-300 text-sm flex items-center space-x-3';
+                banner.innerHTML = '<i class="fa-solid fa-circle-check text-lg"></i> <div><p class="font-bold">Success!</p><p class="text-xs">' + data.message + '</p></div>';
+            } else {
+                banner.className = 'p-4 rounded-xl bg-rose-950/50 border border-rose-500/50 text-rose-300 text-sm flex items-center space-x-3';
+                banner.innerHTML = '<i class="fa-solid fa-circle-xmark text-lg"></i> <div><p class="font-bold">Connection Failed</p><p class="text-xs">' + data.message + '</p></div>';
+            }
+        } catch (err) {
+            banner.classList.remove('hidden');
+            banner.className = 'p-4 rounded-xl bg-rose-950/50 border border-rose-500/50 text-rose-300 text-sm flex items-center space-x-3';
+            banner.innerHTML = '<i class="fa-solid fa-circle-xmark text-lg"></i> <div><p class="font-bold">Error</p><p class="text-xs">' + err.message + '</p></div>';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-bolt text-xs"></i> <span>Test API Connection</span>';
+        }
+    }
+</script>
+{% endblock %}

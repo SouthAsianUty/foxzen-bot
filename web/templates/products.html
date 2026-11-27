@@ -1,0 +1,541 @@
+{% extends "base.html" %}
+
+{% block title %}Products & Catalog - Foxzen Bot Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+
+    <!-- Header bar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-2xl font-bold tracking-tight text-white">Products & Catalog</h2>
+            <p class="text-sm text-slate-400">Manage digital products, pricing in USDT, and category grouping.</p>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button onclick="toggleModal('categoryModal')" class="inline-flex items-center space-x-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium rounded-xl border border-slate-700 transition">
+                <i class="fa-solid fa-folder-plus text-xs"></i>
+                <span>Add Category</span>
+            </button>
+            <button onclick="toggleModal('productModal')" class="inline-flex items-center space-x-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-emerald-950/30 transition">
+                <i class="fa-solid fa-plus text-xs"></i>
+                <span>Add New Product</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Categories Pills -->
+    {% if categories %}
+    <div class="flex flex-wrap items-center gap-2 pb-2">
+        <a href="/products" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold {% if not selected_cat %}bg-emerald-600 text-white{% else %}bg-slate-800 text-slate-300 hover:bg-slate-700{% endif %} transition">
+            All Categories ({{ products|length }})
+        </a>
+        {% for cat in categories %}
+        <div class="inline-flex items-center rounded-xl overflow-hidden border border-slate-700/60 {% if selected_cat == cat.id %}bg-emerald-600 text-white border-emerald-500{% else %}bg-slate-800 text-slate-300{% endif %} text-xs font-semibold">
+            <a href="/products?category_id={{ cat.id }}" class="px-3 py-1.5 hover:text-white">
+                {{ cat.icon }} {{ cat.name }}
+            </a>
+            <form action="/categories/{{ cat.id }}/delete" method="POST" class="inline" onsubmit="return confirm('Delete category {{ cat.name }}? Products in this category will become Uncategorized.')">
+                <button type="submit" class="px-2 py-1.5 text-slate-400 hover:text-rose-400 transition-colors">
+                    <i class="fa-solid fa-xmark text-[10px]"></i>
+                </button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Products Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for p in products %}
+        <div class="bg-darkcard border border-darkborder rounded-2xl p-5 shadow-lg flex flex-col justify-between hover:border-slate-600 transition">
+            <div>
+                <!-- Top Badge & Price -->
+                <div class="flex items-start justify-between gap-2 mb-3">
+                    <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                        {{ p.category_name or 'Uncategorized' }}
+                    </span>
+                    <span class="text-xl font-black text-emerald-400">
+                        ${{ p.price }} <span class="text-xs font-medium text-slate-400">USDT</span>
+                    </span>
+                </div>
+
+                <!-- Product Name -->
+                <h3 class="font-bold text-lg text-white mb-1.5">{{ p.name }}</h3>
+                <p class="text-xs text-slate-400 mb-4 line-clamp-2">{{ p.description or 'No description provided.' }}</p>
+
+                <!-- Stock / Fulfillment status pill -->
+                <div class="mb-4 flex flex-wrap gap-2">
+                    {% if p.fulfillment_type == 'API' %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        <i class="fa-solid fa-plug-circle-bolt mr-1.5 text-[10px]"></i> Reseller API: {{ p.provider_name or 'Connected' }}
+                    </span>
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        ⚡ Auto-Buy
+                    </span>
+                    {% else %}
+                        {% if p.in_stock > 0 %}
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 mr-2"></span> {{ p.in_stock }} Accounts in Stock
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                            <span class="w-2 h-2 rounded-full bg-rose-400 mr-2"></span> Out of Stock
+                        </span>
+                        {% endif %}
+                    {% endif %}
+                </div>
+
+                {% if p.delivery_instructions %}
+                <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 text-xs text-slate-400 mb-4">
+                    <span class="font-semibold text-slate-300">Delivery Note:</span> {{ p.delivery_instructions }}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Bottom Actions -->
+            <div class="pt-4 border-t border-slate-800/80 flex items-center justify-between">
+                {% if p.fulfillment_type == 'API' %}
+                <span class="inline-flex items-center space-x-1.5 text-xs text-slate-400 font-mono">
+                    <i class="fa-solid fa-barcode text-[10px] text-blue-400"></i>
+                    <span>SKU: <b>{{ p.provider_product_id or 'Default' }}</b></span>
+                </span>
+                {% else %}
+                <a href="/stock?product_id={{ p.id }}" class="inline-flex items-center space-x-1.5 text-xs font-semibold text-emerald-400 hover:text-emerald-300">
+                    <i class="fa-solid fa-plus text-[10px]"></i>
+                    <span>Manage Stock</span>
+                </a>
+                {% endif %}
+                <div class="flex items-center space-x-2">
+                    <!-- Edit Button -->
+                    <button onclick='openEditModal({{ p | tojson }})' class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition">
+                        <i class="fa-solid fa-pen-to-square text-xs"></i>
+                    </button>
+                    <!-- Delete Button -->
+                    <form action="/products/{{ p.id }}/delete" method="POST" onsubmit="return confirm('Are you sure you want to delete {{ p.name }}? All unsold stock for this item will also be removed.')" class="inline">
+                        <button type="submit" class="p-2 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 transition">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-span-full py-16 text-center bg-darkcard border border-darkborder rounded-2xl">
+            <i class="fa-solid fa-box-open text-4xl text-slate-600 mb-3 block"></i>
+            <h4 class="font-bold text-lg text-slate-300">No Products Added Yet</h4>
+            <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">Create your first digital product or account type to show in your Telegram Bot.</p>
+            <button onclick="toggleModal('productModal')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-lg transition">
+                Create First Product
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+
+<!-- Modal: Add New Product -->
+<div id="productModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+            <h3 class="font-bold text-lg text-white">Add Digital Product</h3>
+            <button onclick="toggleModal('productModal')" class="text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <form action="/products/create" method="POST" class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Product Title</label>
+                <input type="text" name="name" required placeholder="e.g. Netflix Premium 1 Month"
+                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Price (USDT)</label>
+                    <input type="number" step="0.01" name="price" required placeholder="3.50"
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Category</label>
+                    <select name="category_id" class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500">
+                        <option value="">None / General</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}">{{ cat.icon }} {{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Fulfillment Mode</label>
+                <select name="fulfillment_type" id="create_fulfillment_type" onchange="toggleProviderFields('create')"
+                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500">
+                    <option value="LOCAL">📦 Local Stock (Manual Accounts / Keys uploaded by Admin)</option>
+                    <option value="API">🔌 Reseller API (Auto-Buy from Supplier when customer pays)</option>
+                </select>
+            </div>
+
+            <div id="create_api_fields" class="hidden p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-emerald-400 uppercase tracking-wider mb-1">Select Supplier</label>
+                        <select name="provider_id" id="create_provider_id" onchange="fetchProviderProducts('create')"
+                            class="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-emerald-500">
+                            <option value="">-- Choose Provider --</option>
+                            {% for prv in providers %}
+                            <option value="{{ prv.id }}">{{ prv.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-emerald-400 uppercase tracking-wider mb-1">Supplier Product ID / SKU</label>
+                        <input type="text" name="provider_product_id" id="create_provider_product_id" placeholder="e.g. 104 or nord_1m"
+                            class="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs font-mono focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <!-- Auto-Fetched Products Dropdown -->
+                <div id="create_provider_picker_box" class="hidden pt-1">
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-list-check"></i>
+                            <span>Select Product from Supplier (Auto-fill):</span>
+                        </label>
+                        <button type="button" onclick="fetchProviderProducts('create', true)" class="text-[10px] text-slate-400 hover:text-amber-400 underline">
+                            Try Demo Catalog
+                        </button>
+                    </div>
+                    <select id="create_supplier_product_picker" onchange="onSelectSupplierProduct('create')"
+                        class="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-white text-xs focus:outline-none focus:border-amber-400">
+                        <option value="">-- Choose from Supplier's Catalog --</option>
+                    </select>
+                    <p id="create_provider_picker_msg" class="text-[11px] text-slate-400 mt-1"></p>
+                </div>
+
+                <div id="create_provider_loading" class="hidden text-xs text-amber-400 flex items-center gap-2">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <span>Fetching product list from supplier API...</span>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Wholesale Cost (USDT - Optional)</label>
+                    <input type="number" step="0.01" name="provider_price" id="create_provider_price" placeholder="Cost from supplier"
+                        class="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-emerald-500">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Description</label>
+                <textarea name="description" rows="2" placeholder="4K UHD, 4 screens, Ultra HD warranty..."
+                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500"></textarea>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Delivery Warranty / Rules</label>
+                <textarea name="delivery_instructions" rows="2" placeholder="e.g. Warranty 30 days. Do not change email/password."
+                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500"></textarea>
+            </div>
+
+            <div class="pt-3 border-t border-slate-800 flex justify-end space-x-2">
+                <button type="button" onclick="toggleModal('productModal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">Cancel</button>
+                <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-lg">Save Product</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Add Category -->
+<div id="categoryModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+            <h3 class="font-bold text-lg text-white">Create Category</h3>
+            <button onclick="toggleModal('categoryModal')" class="text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <form action="/categories/create" method="POST" class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Icon / Emoji</label>
+                <input type="text" name="icon" value="📁" required
+                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Category Name</label>
+                <input type="text" name="name" required placeholder="e.g. Streaming Services"
+                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Description (Optional)</label>
+                <input type="text" name="description" placeholder="Short description"
+                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div class="pt-3 border-t border-slate-800 flex justify-end space-x-2">
+                <button type="button" onclick="toggleModal('categoryModal')" class="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl">Cancel</button>
+                <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-lg">Save Category</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Edit Product -->
+<div id="editProductModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+            <h3 class="font-bold text-lg text-white">Edit Product</h3>
+            <button onclick="toggleModal('editProductModal')" class="text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <form id="editProductForm" method="POST" class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Product Title</label>
+                <input type="text" id="edit_name" name="name" required
+                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Price (USDT)</label>
+                    <input type="number" step="0.01" id="edit_price" name="price" required
+                        class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Category</label>
+                    <select id="edit_category_id" name="category_id" class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500">
+                        <option value="">None / General</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}">{{ cat.icon }} {{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Fulfillment Mode</label>
+                <select name="fulfillment_type" id="edit_fulfillment_type" onchange="toggleProviderFields('edit')"
+                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500">
+                    <option value="LOCAL">📦 Local Stock (Manual Accounts / Keys uploaded by Admin)</option>
+                    <option value="API">🔌 Reseller API (Auto-Buy from Supplier when customer pays)</option>
+                </select>
+            </div>
+
+            <div id="edit_api_fields" class="hidden p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-emerald-400 uppercase tracking-wider mb-1">Select Supplier</label>
+                        <select name="provider_id" id="edit_provider_id" onchange="fetchProviderProducts('edit')"
+                            class="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-emerald-500">
+                            <option value="">-- Choose Provider --</option>
+                            {% for prv in providers %}
+                            <option value="{{ prv.id }}">{{ prv.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-emerald-400 uppercase tracking-wider mb-1">Supplier Product ID / SKU</label>
+                        <input type="text" name="provider_product_id" id="edit_provider_product_id" placeholder="e.g. 104 or nord_1m"
+                            class="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs font-mono focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <!-- Auto-Fetched Products Dropdown -->
+                <div id="edit_provider_picker_box" class="hidden pt-1">
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-list-check"></i>
+                            <span>Select Product from Supplier (Auto-fill):</span>
+                        </label>
+                        <button type="button" onclick="fetchProviderProducts('edit', true)" class="text-[10px] text-slate-400 hover:text-amber-400 underline">
+                            Try Demo Catalog
+                        </button>
+                    </div>
+                    <select id="edit_supplier_product_picker" onchange="onSelectSupplierProduct('edit')"
+                        class="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-lg text-white text-xs focus:outline-none focus:border-amber-400">
+                        <option value="">-- Choose from Supplier's Catalog --</option>
+                    </select>
+                    <p id="edit_provider_picker_msg" class="text-[11px] text-slate-400 mt-1"></p>
+                </div>
+
+                <div id="edit_provider_loading" class="hidden text-xs text-amber-400 flex items-center gap-2">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <span>Fetching product list from supplier API...</span>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Wholesale Cost (USDT - Optional)</label>
+                    <input type="number" step="0.01" name="provider_price" id="edit_provider_price" placeholder="Cost from supplier"
+                        class="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-emerald-500">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Description</label>
+                <textarea id="edit_description" name="description" rows="2"
+                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500"></textarea>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Delivery Warranty / Rules</label>
+                <textarea id="edit_delivery_instructions" name="delivery_instructions" rows="2"
+                    class="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500"></textarea>
+            </div>
+
+            <div>
+                <label class="flex items-center space-x-2 text-xs font-medium text-slate-300 cursor-pointer">
+                    <input type="checkbox" id="edit_is_active" name="is_active" value="1" class="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-emerald-500">
+                    <span>Product is Active in Telegram Bot</span>
+                </label>
+            </div>
+
+            <div class="pt-3 border-t border-slate-800 flex justify-end space-x-2">
+                <button type="button" onclick="toggleModal('editProductModal')" class="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl">Cancel</button>
+                <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-lg">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function toggleModal(id) {
+        const el = document.getElementById(id);
+        el.classList.toggle('hidden');
+    }
+
+    function toggleProviderFields(prefix) {
+        const typeEl = document.getElementById(prefix + '_fulfillment_type');
+        const fieldsEl = document.getElementById(prefix + '_api_fields');
+        if (typeEl && fieldsEl) {
+            if (typeEl.value === 'API') {
+                fieldsEl.classList.remove('hidden');
+            } else {
+                fieldsEl.classList.add('hidden');
+            }
+        }
+    }
+
+    function openEditModal(prod) {
+        document.getElementById('editProductForm').action = '/products/' + prod.id + '/edit';
+        document.getElementById('edit_name').value = prod.name;
+        document.getElementById('edit_price').value = prod.price;
+        document.getElementById('edit_category_id').value = prod.category_id || '';
+        document.getElementById('edit_description').value = prod.description || '';
+        document.getElementById('edit_delivery_instructions').value = prod.delivery_instructions || '';
+        document.getElementById('edit_is_active').checked = prod.is_active == 1;
+
+        document.getElementById('edit_fulfillment_type').value = prod.fulfillment_type || 'LOCAL';
+        document.getElementById('edit_provider_id').value = prod.provider_id || '';
+        document.getElementById('edit_provider_product_id').value = prod.provider_product_id || '';
+        document.getElementById('edit_provider_price').value = prod.provider_price || '';
+        toggleProviderFields('edit');
+
+        toggleModal('editProductModal');
+    }
+
+    async function fetchProviderProducts(prefix, useSample = false) {
+        const provSelect = document.getElementById(prefix + '_provider_id');
+        const pickerBox = document.getElementById(prefix + '_provider_picker_box');
+        const picker = document.getElementById(prefix + '_supplier_product_picker');
+        const loading = document.getElementById(prefix + '_provider_loading');
+        const msg = document.getElementById(prefix + '_provider_picker_msg');
+
+        if (!provSelect || !provSelect.value) {
+            if (pickerBox) pickerBox.classList.add('hidden');
+            return;
+        }
+
+        const providerId = provSelect.value;
+        if (loading) loading.classList.remove('hidden');
+        if (pickerBox) pickerBox.classList.add('hidden');
+
+        try {
+            const url = '/api/providers/' + providerId + '/products' + (useSample ? '?sample=true' : '');
+            const resp = await fetch(url);
+            const data = await resp.json();
+
+            if (loading) loading.classList.add('hidden');
+
+            if (data.success && data.products && data.products.length > 0) {
+                picker.innerHTML = '<option value="">-- Click to choose product (' + data.products.length + ' available) --</option>';
+                data.products.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.dataset.name = p.name;
+                    opt.dataset.price = p.price || 0.0;
+                    opt.dataset.category = p.category || '';
+                    opt.textContent = `[#${p.id}] ${p.name} — Cost: $${parseFloat(p.price || 0).toFixed(2)} USDT (${p.category || 'General'})`;
+                    picker.appendChild(opt);
+                });
+                pickerBox.classList.remove('hidden');
+                msg.textContent = `✅ ${data.products.length} products loaded from ${data.provider_name || 'supplier'}. Select one to auto-fill.`;
+                msg.className = "text-[11px] text-emerald-400 mt-1";
+            } else {
+                pickerBox.classList.remove('hidden');
+                picker.innerHTML = '<option value="">No automatic catalog endpoint found</option>';
+                msg.innerHTML = `⚠️ Supplier API returned no product list. <a href="javascript:void(0)" onclick="fetchProviderProducts('${prefix}', true)" class="text-amber-400 underline font-semibold">Click here to load Demo Products</a> or enter ID manually.`;
+                msg.className = "text-[11px] text-slate-400 mt-1";
+            }
+        } catch (e) {
+            if (loading) loading.classList.add('hidden');
+            if (pickerBox) pickerBox.classList.remove('hidden');
+            picker.innerHTML = '<option value="">Error fetching catalog</option>';
+            msg.innerHTML = `❌ Failed to fetch: ${e}. <a href="javascript:void(0)" onclick="fetchProviderProducts('${prefix}', true)" class="text-amber-400 underline font-semibold">Try Demo Products</a>.`;
+        }
+    }
+
+    function onSelectSupplierProduct(prefix) {
+        const picker = document.getElementById(prefix + '_supplier_product_picker');
+        const selected = picker.options[picker.selectedIndex];
+        if (!selected || !selected.value) return;
+
+        const prodId = selected.value;
+        const prodName = selected.dataset.name;
+        const prodPrice = selected.dataset.price;
+        const prodCat = selected.dataset.category;
+
+        // Fill SKU
+        const skuEl = document.getElementById(prefix + '_provider_product_id');
+        if (skuEl) skuEl.value = prodId;
+
+        // Fill Wholesale price
+        const wholesaleEl = document.getElementById(prefix + '_provider_price');
+        if (wholesaleEl) wholesaleEl.value = prodPrice;
+
+        // Fill Title
+        const titleEl = document.querySelector(prefix === 'create' ? 'input[name="name"]' : '#edit_name');
+        if (titleEl) {
+            titleEl.value = prodName;
+        }
+
+        // Try to auto-select matching category
+        const catSelect = document.querySelector(prefix === 'create' ? 'select[name="category_id"]' : '#edit_category_id');
+        if (catSelect && prodCat) {
+            for (let i = 0; i < catSelect.options.length; i++) {
+                if (catSelect.options[i].text.toLowerCase().includes(prodCat.toLowerCase()) || 
+                    prodCat.toLowerCase().includes(catSelect.options[i].text.toLowerCase())) {
+                    catSelect.selectedIndex = i;
+                    break;
+                }
+            }
+        }
+
+        // Focus on selling price
+        const priceEl = document.querySelector(prefix === 'create' ? 'input[name="price"]' : '#edit_price');
+        if (priceEl) {
+            priceEl.focus();
+            if (!priceEl.value || parseFloat(priceEl.value) <= 0) {
+                // Pre-fill suggested retail markup (+30-50% or +$1)
+                const cost = parseFloat(prodPrice) || 0.0;
+                if (cost > 0) {
+                    priceEl.value = (cost * 1.3).toFixed(2);
+                }
+            }
+        }
+    }
+</script>
+{% endblock %}

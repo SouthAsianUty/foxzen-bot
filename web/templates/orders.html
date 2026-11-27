@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Orders & Binance Payments - Foxzen Bot Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+
+    <!-- Header bar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-2xl font-bold tracking-tight text-white">Orders & Binance Payments</h2>
+            <p class="text-sm text-slate-400">Review submitted Binance transactions, verify payments, and check delivered accounts.</p>
+        </div>
+    </div>
+
+    <!-- Status Filters Bar -->
+    <div class="flex flex-wrap items-center gap-2">
+        <a href="/orders" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold {% if not current_status %}bg-emerald-600 text-white{% else %}bg-slate-800 text-slate-300 hover:bg-slate-700{% endif %} transition">
+            All Orders ({{ orders|length }})
+        </a>
+        <a href="/orders?status=PENDING_VERIFICATION" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold {% if current_status == 'PENDING_VERIFICATION' %}bg-amber-600 text-white{% else %}bg-slate-800 text-slate-300 hover:bg-slate-700{% endif %} transition flex items-center space-x-1.5">
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+            <span>Pending Review</span>
+        </a>
+        <a href="/orders?status=COMPLETED" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold {% if current_status == 'COMPLETED' %}bg-emerald-600 text-white{% else %}bg-slate-800 text-slate-300 hover:bg-slate-700{% endif %} transition flex items-center space-x-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span>Delivered / Completed</span>
+        </a>
+        <a href="/orders?status=PENDING_PAYMENT" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold {% if current_status == 'PENDING_PAYMENT' %}bg-sky-600 text-white{% else %}bg-slate-800 text-slate-300 hover:bg-slate-700{% endif %} transition flex items-center space-x-1.5">
+            <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+            <span>Unpaid Checkout Attempts</span>
+        </a>
+    </div>
+
+    <!-- Orders Table -->
+    <div class="bg-darkcard border border-darkborder rounded-2xl overflow-hidden shadow-xl">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-slate-900/60 text-slate-400 uppercase text-[11px] tracking-wider border-b border-darkborder">
+                    <tr>
+                        <th class="py-3 px-4">Order ID & Date</th>
+                        <th class="py-3 px-4">Customer</th>
+                        <th class="py-3 px-4">Product</th>
+                        <th class="py-3 px-4">Amount</th>
+                        <th class="py-3 px-4">Binance TxID</th>
+                        <th class="py-3 px-4">Delivered Credentials</th>
+                        <th class="py-3 px-4">Status</th>
+                        <th class="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-darkborder">
+                    {% for order in orders %}
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <!-- Order ID & Date -->
+                        <td class="py-3.5 px-4">
+                            <span class="font-mono font-bold text-emerald-400 text-xs">#{{ order.order_id }}</span>
+                            <p class="text-[11px] text-slate-500 mt-0.5">{{ order.created_at[:16] if order.created_at else '' }}</p>
+                        </td>
+
+                        <!-- Customer -->
+                        <td class="py-3.5 px-4 text-xs">
+                            {% if order.username %}
+                            <a href="https://t.me/{{ order.username }}" target="_blank" class="text-blue-400 font-semibold hover:underline">@{{ order.username }}</a>
+                            {% else %}
+                            <span class="text-slate-300 font-medium">{{ order.first_name or 'User' }}</span>
+                            {% endif %}
+                            <p class="text-[10px] text-slate-500 font-mono flex items-center gap-1.5 mt-0.5">
+                                <span>ID: {{ order.telegram_id }}</span>
+                                <a href="/users?user_id={{ order.telegram_id }}" title="Credit Wallet for this customer" class="text-purple-400 hover:text-purple-300 transition">
+                                    <i class="fa-solid fa-wallet text-[9px]"></i>
+                                </a>
+                            </p>
+                        </td>
+
+                        <!-- Product -->
+                        <td class="py-3.5 px-4 text-xs text-slate-200 font-medium">
+                            {{ order.product_name }}
+                            {% if order.quantity and order.quantity > 1 %}
+                            <span class="ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">x{{ order.quantity }}</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Amount -->
+                        <td class="py-3.5 px-4 text-xs font-bold text-white whitespace-nowrap">
+                            ${{ order.amount }} USDT
+                        </td>
+
+                        <!-- TxID -->
+                        <td class="py-3.5 px-4">
+                            {% if order.binance_tx_id == 'WALLET_BALANCE' or order.binance_tx_id == 'WALLET' %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-purple-500/10 border border-purple-500/30 text-purple-300">
+                                <i class="fa-solid fa-wallet"></i> Wallet Balance
+                            </span>
+                            {% elif order.binance_tx_id %}
+                            <code class="bg-slate-900 border border-slate-700/80 px-2 py-0.5 rounded text-xs text-amber-300 font-mono select-all">{{ order.binance_tx_id }}</code>
+                            {% else %}
+                            <span class="text-slate-500 text-xs">-</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Delivered Credentials -->
+                        <td class="py-3.5 px-4 max-w-xs">
+                            {% if order.delivered_data %}
+                            <div class="bg-slate-900/90 border border-emerald-500/30 px-2 py-1 rounded text-emerald-300 font-mono text-xs truncate select-all" title="{{ order.delivered_data }}">
+                                {{ order.delivered_data }}
+                            </div>
+                            {% else %}
+                            <span class="text-slate-500 text-xs">Not delivered</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Status Badge -->
+                        <td class="py-3.5 px-4">
+                            {% if order.status == 'COMPLETED' %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span> Delivered
+                            </span>
+                            {% elif order.status == 'PENDING_VERIFICATION' %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
+                                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1.5"></span> Verify TxID
+                            </span>
+                            {% elif order.status == 'PENDING_PAYMENT' %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                <span class="w-1.5 h-1.5 rounded-full bg-blue-400 mr-1.5"></span> Unpaid
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                {{ order.status }}
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Action Buttons -->
+                        <td class="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                            {% if order.status == 'PENDING_VERIFICATION' %}
+                            <!-- Approve & Deliver -->
+                            <form action="/orders/{{ order.order_id }}/approve" method="POST" class="inline">
+                                <button type="submit" title="Verify & Deliver to Telegram Bot" onclick="return confirm('Approve order #{{ order.order_id }} and automatically send credentials to @{{ order.username or order.telegram_id }}?')"
+                                    class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition">
+                                    <i class="fa-solid fa-check mr-1"></i> Approve & Deliver
+                                </button>
+                            </form>
+
+                            <!-- Check with Binance API -->
+                            <form action="/orders/{{ order.order_id }}/verify-binance" method="POST" class="inline">
+                                <button type="submit" title="Re-check via Binance API" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-xs transition border border-slate-700">
+                                    <i class="fa-solid fa-rotate"></i>
+                                </button>
+                            </form>
+
+                            <!-- Reject -->
+                            <form action="/orders/{{ order.order_id }}/reject" method="POST" class="inline">
+                                <button type="submit" title="Reject Order" onclick="return confirm('Reject order #{{ order.order_id }}?')"
+                                    class="px-2 py-1 bg-slate-800 hover:bg-rose-900/60 text-slate-400 hover:text-rose-400 rounded-lg text-xs transition border border-slate-700">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </form>
+                            {% elif order.status == 'PENDING_PAYMENT' %}
+                            <form action="/orders/{{ order.order_id }}/reject" method="POST" class="inline">
+                                <button type="submit" title="Cancel Unpaid Order" onclick="return confirm('Cancel order #{{ order.order_id }}?')"
+                                    class="px-2 py-1 bg-slate-800 hover:bg-rose-900/60 text-slate-400 hover:text-rose-400 rounded-lg text-xs transition border border-slate-700">
+                                    <i class="fa-solid fa-trash-can"></i> Cancel
+                                </button>
+                            </form>
+                            {% else %}
+                            <span class="text-xs text-slate-500 font-mono">Done</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="py-12 text-center text-slate-500 text-sm">
+                            <i class="fa-solid fa-receipt text-3xl mb-2 text-slate-600 block"></i>
+                            No orders found matching the filter.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

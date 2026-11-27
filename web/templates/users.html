@@ -1,0 +1,499 @@
+{% extends "base.html" %}
+
+{% block title %}Users & Wallets - Foxzen Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Top Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-black text-white flex items-center gap-2.5">
+                <span class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-wallet"></i>
+                </span>
+                <span>Users & Wallets Management</span>
+            </h1>
+            <p class="text-sm text-slate-400 mt-1">Add funds, adjust balances, and monitor customer wallet credits in real-time.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <button onclick="openFundModal()" class="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold rounded-xl text-sm shadow-lg shadow-purple-900/30 flex items-center gap-2 transition transform active:scale-95">
+                <i class="fa-solid fa-plus-circle"></i>
+                <span>Credit Wallet Funds</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 3 Key Metric Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <!-- Total Users -->
+        <div class="bg-darkcard border border-darkborder rounded-2xl p-5 shadow-lg relative overflow-hidden group">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Bot Customers</p>
+                    <h3 class="text-2xl font-black text-white mt-1">{{ users|length }}</h3>
+                </div>
+                <div class="w-11 h-11 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center text-lg">
+                    <i class="fa-brands fa-telegram"></i>
+                </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                <span>Registered members</span>
+                <span class="text-purple-400 font-semibold">{{ users|length }} total</span>
+            </div>
+        </div>
+
+        <!-- Total Wallet Balance -->
+        <div class="bg-darkcard border border-darkborder rounded-2xl p-5 shadow-lg relative overflow-hidden group">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total User Balances</p>
+                    <h3 class="text-2xl font-black text-white mt-1">${{ "%.2f"|format(total_balance) }} <span class="text-xs font-normal text-emerald-400">USDT</span></h3>
+                </div>
+                <div class="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-coins"></i>
+                </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                <span>Customer wallet funds</span>
+                <span class="text-emerald-400 font-semibold">Active liability</span>
+            </div>
+        </div>
+
+        <!-- Active Funded Wallets -->
+        <div class="bg-darkcard border border-darkborder rounded-2xl p-5 shadow-lg relative overflow-hidden group">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Funded Wallets</p>
+                    <h3 class="text-2xl font-black text-white mt-1">{{ active_wallets }} <span class="text-xs font-normal text-slate-400">users</span></h3>
+                </div>
+                <div class="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-credit-card"></i>
+                </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                <span>With balance &gt; $0</span>
+                <span class="text-blue-400 font-semibold">{{ active_wallets }} / {{ users|length }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Add Fund Form Card -->
+    <div id="addFundCard" class="bg-darkcard border border-darkborder rounded-2xl shadow-xl overflow-hidden relative">
+        <div class="p-5 border-b border-darkborder bg-gradient-to-r from-purple-900/20 to-slate-900/40 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-400 flex items-center justify-center">
+                    <i class="fa-solid fa-circle-plus"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-white text-base">Add Wallet Funds to Customer</h3>
+                    <p class="text-xs text-slate-400">Credit USDT balance directly to any Telegram user and notify them instantly.</p>
+                </div>
+            </div>
+            <span class="px-2.5 py-1 rounded bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-semibold">
+                Instant Credit
+            </span>
+        </div>
+
+        <form action="/users/add-fund" method="POST" class="p-6 space-y-5" onsubmit="return validateFundForm(this)">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <!-- Select Customer -->
+                <div class="space-y-1.5 lg:col-span-1">
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                        Select Customer <span class="text-rose-400">*</span>
+                    </label>
+                    <select id="userSelectDropdown" name="telegram_id" onchange="toggleCustomInput(this.value)" required
+                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-purple-500 transition">
+                        <option value="">-- Choose a Customer --</option>
+                        {% for u in users %}
+                        <option value="{{ u.telegram_id }}" {% if preselected_user_id and preselected_user_id == u.telegram_id %}selected{% endif %}>
+                            {{ u.first_name }} {% if u.username %}(@{{ u.username }}){% endif %} - ID: {{ u.telegram_id }} [Bal: ${{ "%.2f"|format(u.balance or 0.0) }}]
+                        </option>
+                        {% endfor %}
+                        <option value="CUSTOM">➕ Or enter manual Telegram ID...</option>
+                    </select>
+
+                    <div id="customIdContainer" class="hidden mt-2">
+                        <input type="number" id="manualIdInput" placeholder="Enter Telegram ID (e.g. 123456789)"
+                            class="w-full px-3.5 py-2 bg-slate-900 border border-purple-500/50 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400">
+                    </div>
+                </div>
+
+                <!-- Amount (USDT) -->
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                        Amount (USDT) <span class="text-rose-400">*</span>
+                    </label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-sm font-bold">$</span>
+                        <input type="number" step="0.01" min="0.01" id="fundAmountInput" name="amount" placeholder="0.00" required
+                            class="w-full pl-8 pr-16 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white font-bold placeholder-slate-500 focus:outline-none focus:border-purple-500 transition">
+                        <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 text-xs font-bold">USDT</span>
+                    </div>
+
+                    <!-- Quick Preset Chips -->
+                    <div class="flex items-center gap-1.5 pt-1">
+                        <button type="button" onclick="setPresetAmount(5)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition border border-slate-700">+$5</button>
+                        <button type="button" onclick="setPresetAmount(10)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition border border-slate-700">+$10</button>
+                        <button type="button" onclick="setPresetAmount(25)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition border border-slate-700">+$25</button>
+                        <button type="button" onclick="setPresetAmount(50)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition border border-slate-700">+$50</button>
+                        <button type="button" onclick="setPresetAmount(100)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition border border-slate-700">+$100</button>
+                    </div>
+                </div>
+
+                <!-- Action Type -->
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                        Action Type
+                    </label>
+                    <div class="grid grid-cols-3 gap-2 pt-0.5">
+                        <label class="flex items-center justify-center gap-1.5 p-2 rounded-xl border border-emerald-500/30 bg-emerald-950/20 text-emerald-300 text-xs font-bold cursor-pointer hover:bg-emerald-950/40 transition">
+                            <input type="radio" name="action" value="add" checked class="text-emerald-500 focus:ring-0">
+                            <span>+ Add</span>
+                        </label>
+                        <label class="flex items-center justify-center gap-1.5 p-2 rounded-xl border border-rose-500/30 bg-rose-950/20 text-rose-300 text-xs font-bold cursor-pointer hover:bg-rose-950/40 transition">
+                            <input type="radio" name="action" value="deduct" class="text-rose-500 focus:ring-0">
+                            <span>- Deduct</span>
+                        </label>
+                        <label class="flex items-center justify-center gap-1.5 p-2 rounded-xl border border-blue-500/30 bg-blue-950/20 text-blue-300 text-xs font-bold cursor-pointer hover:bg-blue-950/40 transition">
+                            <input type="radio" name="action" value="set" class="text-blue-500 focus:ring-0">
+                            <span>✏️ Set Exact</span>
+                        </label>
+                    </div>
+                    <p class="text-[11px] text-slate-400">💡 <i>Tip: Use <b>- Deduct</b> to remove extra funds, or <b>Set Exact</b> to correct balance.</i></p>
+                </div>
+            </div>
+
+            <!-- Optional Remark & Notification Row -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2 border-t border-slate-800/80">
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                        Remark / Note <span class="text-slate-500 font-normal">(Optional)</span>
+                    </label>
+                    <input type="text" name="note" placeholder="e.g. Binance Pay Deposit (TxID #717053382), Order refund, Promo bonus..."
+                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition">
+                </div>
+
+                <div class="flex items-center justify-between pt-5">
+                    <label class="flex items-center gap-2.5 cursor-pointer">
+                        <input type="checkbox" name="notify_user" value="on" checked class="w-4 h-4 rounded text-purple-600 bg-slate-900 border-slate-700 focus:ring-0">
+                        <span class="text-xs text-slate-300 font-medium">📢 Send receipt &amp; update notification to customer on Telegram</span>
+                    </label>
+
+                    <button type="submit" class="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-emerald-900/30 transition transform active:scale-95 flex items-center gap-2">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        <span>Apply &amp; Credit Funds</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Users Table Card with Realtime Search -->
+    <div class="bg-darkcard border border-darkborder rounded-2xl shadow-xl overflow-hidden">
+        <!-- Search & Filter Bar -->
+        <div class="p-4 sm:p-5 border-b border-darkborder flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="relative flex-1 max-w-md">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input type="text" id="userSearchInput" onkeyup="filterUserTable()" placeholder="Search by name, @username, or Telegram ID..."
+                    class="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition">
+            </div>
+
+            <div class="flex items-center gap-2">
+                <select id="balanceFilter" onchange="filterUserTable()" class="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-300 focus:outline-none">
+                    <option value="ALL">All Balances</option>
+                    <option value="FUNDED">Funded Wallets (&gt; $0)</option>
+                    <option value="ZERO">Zero Balance ($0)</option>
+                </select>
+                <span class="text-xs text-slate-400 px-2 font-medium" id="userCountBadge">{{ users|length }} users</span>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse" id="usersTable">
+                <thead>
+                    <tr class="border-b border-darkborder bg-slate-900/60 text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
+                        <th class="py-3 px-4">Customer</th>
+                        <th class="py-3 px-4">Telegram ID</th>
+                        <th class="py-3 px-4">Wallet Balance</th>
+                        <th class="py-3 px-4">Referrals</th>
+                        <th class="py-3 px-4">Joined Date</th>
+                        <th class="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-darkborder text-sm">
+                    {% for u in users %}
+                    <tr class="user-row hover:bg-slate-800/40 transition" 
+                        data-name="{{ u.first_name|lower }}" 
+                        data-username="{{ (u.username or '')|lower }}" 
+                        data-id="{{ u.telegram_id }}"
+                        data-balance="{{ u.balance or 0.0 }}">
+                        
+                        <!-- Customer Name & Handle -->
+                        <td class="py-3.5 px-4 whitespace-nowrap">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-white uppercase">
+                                    {{ u.first_name[:1] if u.first_name else 'U' }}
+                                </div>
+                                <div>
+                                    <div class="font-bold text-white text-xs">{{ u.first_name }}</div>
+                                    {% if u.username %}
+                                    <a href="https://t.me/{{ u.username }}" target="_blank" class="text-[11px] text-emerald-400 hover:underline flex items-center gap-1">
+                                        <span>@{{ u.username }}</span>
+                                        <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                                    </a>
+                                    {% else %}
+                                    <span class="text-[11px] text-slate-500">No @handle</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Telegram ID with Copy -->
+                        <td class="py-3.5 px-4 whitespace-nowrap">
+                            <button onclick="copyToClipboard('{{ u.telegram_id }}', this)" title="Click to copy Telegram ID"
+                                class="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 px-2 py-0.5 rounded text-xs text-purple-300 font-mono transition">
+                                <span>{{ u.telegram_id }}</span>
+                                <i class="fa-regular fa-copy text-[10px] text-slate-500"></i>
+                            </button>
+                        </td>
+
+                        <!-- Balance -->
+                        <td class="py-3.5 px-4 whitespace-nowrap">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold {% if (u.balance or 0.0) > 0 %}bg-emerald-500/10 border border-emerald-500/30 text-emerald-300{% else %}bg-slate-800 text-slate-400 border border-slate-700{% endif %}">
+                                <i class="fa-solid fa-coins"></i> ${{ "%.2f"|format(u.balance or 0.0) }} USDT
+                            </span>
+                        </td>
+
+                        <!-- Referrals -->
+                        <td class="py-3.5 px-4 whitespace-nowrap text-xs text-slate-300">
+                            <span class="font-semibold text-white">{{ u.referrals_count or 0 }}</span> invites
+                        </td>
+
+                        <!-- Joined Date -->
+                        <td class="py-3.5 px-4 whitespace-nowrap text-xs text-slate-400">
+                            {{ u.joined_at }}
+                        </td>
+
+                        <!-- Quick Actions -->
+                        <td class="py-3.5 px-4 text-right whitespace-nowrap space-x-1.5">
+                            <button onclick="selectUserForFund('{{ u.telegram_id }}', '{{ u.first_name }}', '{{ u.balance or 0.0 }}')"
+                                class="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold shadow-sm transition inline-flex items-center gap-1">
+                                <i class="fa-solid fa-plus text-[10px]"></i>
+                                <span>Add Funds</span>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="py-10 text-center text-slate-500 text-sm">
+                            <i class="fa-solid fa-users text-3xl mb-2 text-slate-600 block"></i>
+                            No bot users found yet. Once customers tap /start on @foxzen_bot, they will appear here.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Quick Add Funds -->
+<div id="quickFundModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-darkcard border border-darkborder rounded-2xl w-full max-w-md shadow-2xl overflow-hidden transform transition-all">
+        <div class="p-5 border-b border-darkborder bg-gradient-to-r from-purple-900/30 to-slate-900 flex items-center justify-between">
+            <h3 class="font-bold text-white text-base flex items-center gap-2">
+                <i class="fa-solid fa-wallet text-purple-400"></i>
+                <span>Credit User Wallet</span>
+            </h3>
+            <button onclick="closeFundModal()" class="text-slate-400 hover:text-white transition">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <form action="/users/add-fund" method="POST" class="p-5 space-y-4">
+            <input type="hidden" id="modalTelegramId" name="telegram_id">
+            
+            <!-- User Info Badge -->
+            <div class="p-3 bg-slate-900/80 border border-slate-700/80 rounded-xl flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400">Target User</p>
+                    <p class="text-sm font-bold text-white" id="modalUserName">Customer</p>
+                    <p class="text-[11px] text-purple-400 font-mono" id="modalUserSub">ID: -</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-[11px] text-slate-400">Current Balance</p>
+                    <p class="text-sm font-black text-emerald-400" id="modalUserBal">$0.00 USDT</p>
+                </div>
+            </div>
+
+            <!-- Amount Input -->
+            <div class="space-y-1">
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">Amount (USDT)</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-sm font-bold">$</span>
+                    <input type="number" step="0.01" min="0.01" id="modalAmountInput" name="amount" placeholder="0.00" required autofocus
+                        class="w-full pl-8 pr-16 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white font-bold placeholder-slate-500 focus:outline-none focus:border-purple-500">
+                    <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 text-xs font-bold">USDT</span>
+                </div>
+                <!-- Presets -->
+                <div class="flex items-center gap-1.5 pt-1">
+                    <button type="button" onclick="setModalPreset(5)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold border border-slate-700">+$5</button>
+                    <button type="button" onclick="setModalPreset(10)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold border border-slate-700">+$10</button>
+                    <button type="button" onclick="setModalPreset(25)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold border border-slate-700">+$25</button>
+                    <button type="button" onclick="setModalPreset(50)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold border border-slate-700">+$50</button>
+                </div>
+            </div>
+
+            <!-- Action -->
+            <div class="grid grid-cols-3 gap-2">
+                <label class="flex items-center justify-center gap-1.5 p-2 rounded-xl border border-emerald-500/30 bg-emerald-950/20 text-emerald-300 text-xs font-bold cursor-pointer hover:bg-emerald-950/40 transition">
+                    <input type="radio" name="action" value="add" checked class="text-emerald-500 focus:ring-0">
+                    <span>+ Add</span>
+                </label>
+                <label class="flex items-center justify-center gap-1.5 p-2 rounded-xl border border-rose-500/30 bg-rose-950/20 text-rose-300 text-xs font-bold cursor-pointer hover:bg-rose-950/40 transition">
+                    <input type="radio" name="action" value="deduct" class="text-rose-500 focus:ring-0">
+                    <span>- Deduct</span>
+                </label>
+                <label class="flex items-center justify-center gap-1.5 p-2 rounded-xl border border-blue-500/30 bg-blue-950/20 text-blue-300 text-xs font-bold cursor-pointer hover:bg-blue-950/40 transition">
+                    <input type="radio" name="action" value="set" class="text-blue-500 focus:ring-0">
+                    <span>✏️ Set Exact</span>
+                </label>
+            </div>
+            <p class="text-[11px] text-slate-400">💡 <i>Select <b>- Deduct</b> or <b>Set Exact</b> if you mistakenly credited extra.</i></p>
+
+            <!-- Remark -->
+            <div class="space-y-1">
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">Remark / Reason</label>
+                <input type="text" name="note" placeholder="e.g. Binance Pay deposit, Order refund..."
+                    class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500">
+            </div>
+
+            <!-- Notify Checkbox -->
+            <label class="flex items-center gap-2 cursor-pointer pt-1">
+                <input type="checkbox" name="notify_user" value="on" checked class="w-4 h-4 rounded text-purple-600 bg-slate-900 border-slate-700 focus:ring-0">
+                <span class="text-xs text-slate-300">📢 Send receipt to customer in Telegram</span>
+            </label>
+
+            <!-- Buttons -->
+            <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button type="button" onclick="closeFundModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold">
+                    Cancel
+                </button>
+                <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-900/30">
+                    Confirm &amp; Apply
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function setPresetAmount(val) {
+    document.getElementById('fundAmountInput').value = val.toFixed(2);
+}
+
+function setModalPreset(val) {
+    document.getElementById('modalAmountInput').value = val.toFixed(2);
+}
+
+function toggleCustomInput(val) {
+    const customDiv = document.getElementById('customIdContainer');
+    const manualInput = document.getElementById('manualIdInput');
+    if (val === 'CUSTOM') {
+        customDiv.classList.remove('hidden');
+        manualInput.required = true;
+        manualInput.focus();
+    } else {
+        customDiv.classList.add('hidden');
+        manualInput.required = false;
+    }
+}
+
+function validateFundForm(form) {
+    const sel = document.getElementById('userSelectDropdown').value;
+    if (sel === 'CUSTOM') {
+        const manualVal = document.getElementById('manualIdInput').value;
+        if (!manualVal || manualVal.trim() === '') {
+            alert('Please enter a valid Telegram ID.');
+            return false;
+        }
+        // Change the select value to manual input for submit
+        const opt = document.createElement('option');
+        opt.value = manualVal.trim();
+        opt.selected = true;
+        document.getElementById('userSelectDropdown').appendChild(opt);
+    }
+    return true;
+}
+
+function selectUserForFund(id, name, balance) {
+    const modal = document.getElementById('quickFundModal');
+    document.getElementById('modalTelegramId').value = id;
+    document.getElementById('modalUserName').innerText = name;
+    document.getElementById('modalUserSub').innerText = 'Telegram ID: ' + id;
+    document.getElementById('modalUserBal').innerText = '$' + parseFloat(balance).toFixed(2) + ' USDT';
+    document.getElementById('modalAmountInput').value = '';
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.getElementById('modalAmountInput').focus();
+}
+
+function openFundModal() {
+    const firstOption = document.querySelector('#userSelectDropdown option:nth-child(2)');
+    if (firstOption && firstOption.value && firstOption.value !== 'CUSTOM') {
+        document.getElementById('userSelectDropdown').selectedIndex = 1;
+    }
+    const card = document.getElementById('addFundCard');
+    card.scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('fundAmountInput').focus();
+}
+
+function closeFundModal() {
+    const modal = document.getElementById('quickFundModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+function filterUserTable() {
+    const query = document.getElementById('userSearchInput').value.toLowerCase().trim();
+    const filter = document.getElementById('balanceFilter').value;
+    const rows = document.querySelectorAll('.user-row');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        const name = row.getAttribute('data-name') || '';
+        const username = row.getAttribute('data-username') || '';
+        const id = row.getAttribute('data-id') || '';
+        const bal = parseFloat(row.getAttribute('data-balance') || '0');
+
+        const matchesQuery = !query || name.includes(query) || username.includes(query) || id.includes(query);
+        let matchesFilter = true;
+        if (filter === 'FUNDED') {
+            matchesFilter = bal > 0;
+        } else if (filter === 'ZERO') {
+            matchesFilter = bal <= 0;
+        }
+
+        if (matchesQuery && matchesFilter) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    document.getElementById('userCountBadge').innerText = visibleCount + ' users';
+}
+
+function copyToClipboard(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+        const icon = btn.querySelector('i');
+        icon.className = 'fa-solid fa-check text-emerald-400 text-[10px]';
+        setTimeout(() => {
+            icon.className = 'fa-regular fa-copy text-[10px] text-slate-500';
+        }, 1500);
+    });
+}
+</script>
+{% endblock %}

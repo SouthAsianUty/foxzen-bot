@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Foxzen Bot Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+
+    <!-- Top Page Bar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-2xl font-bold tracking-tight text-white">Store Overview</h2>
+            <p class="text-sm text-slate-400">Real-time status of your store, orders, and Binance payments.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+            <a href="/users" class="inline-flex items-center space-x-2 px-3.5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-lg shadow-purple-950/30 transition">
+                <i class="fa-solid fa-wallet text-xs"></i>
+                <span>Credit User Wallet</span>
+            </a>
+            <a href="/products" class="inline-flex items-center space-x-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-lg shadow-emerald-950/30 transition">
+                <i class="fa-solid fa-plus text-xs"></i>
+                <span>Add Product</span>
+            </a>
+            <a href="/stock" class="inline-flex items-center space-x-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-medium rounded-xl border border-slate-700 transition">
+                <i class="fa-solid fa-upload text-xs"></i>
+                <span>Add Stock</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Alert if Bot Token is Missing -->
+    {% if not bot_configured %}
+    <div class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 flex items-start space-x-3">
+        <i class="fa-solid fa-triangle-exclamation text-amber-400 text-lg mt-0.5"></i>
+        <div>
+            <p class="font-semibold text-sm">Telegram Bot Token Not Configured</p>
+            <p class="text-xs text-amber-300/80 mt-0.5">Your Telegram bot cannot receive messages until you set your Bot Token in Settings.</p>
+            <a href="/settings" class="inline-block mt-2 text-xs font-bold text-amber-400 underline hover:text-amber-300">Configure Bot Token Now &rarr;</a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 5 Key Stat Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <!-- Revenue Card -->
+        <div class="bg-darkcard border border-darkborder rounded-2xl p-5 shadow-lg relative overflow-hidden group">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Revenue</p>
+                    <h3 class="text-2xl font-black text-white mt-1">${{ stats.total_revenue }} <span class="text-xs font-normal text-emerald-400">USDT</span></h3>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-dollar-sign"></i>
+                </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                <span>Completed Sales</span>
+                <span class="text-emerald-400 font-semibold">{{ stats.completed_orders }} orders</span>
+            </div>
+        </div>
+
+        <!-- Pending Verification Card -->
+        <div class="bg-darkcard border {% if stats.pending_orders > 0 %}border-amber-500/50 bg-amber-950/10{% else %}border-darkborder{% endif %} rounded-2xl p-5 shadow-lg relative overflow-hidden group">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Pending Review</p>
+                    <h3 class="text-2xl font-black {% if stats.pending_orders > 0 %}text-amber-400{% else %}text-white{% endif %} mt-1">{{ stats.pending_orders }}</h3>
+                </div>
+                <div class="w-12 h-12 rounded-xl {% if stats.pending_orders > 0 %}bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse{% else %}bg-slate-800 text-slate-400 border border-slate-700{% endif %} flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                {% if stats.pending_orders > 0 %}
+                <span class="text-amber-300 font-medium">Verify TxID</span>
+                <a href="/orders?status=PENDING_VERIFICATION" class="text-amber-400 underline font-semibold">View</a>
+                {% else %}
+                <span class="text-slate-400">All reviewed</span>
+                <span class="text-emerald-400">Clear</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Unpaid Checkout Attempts (Web Admin Visibility) -->
+        <div class="bg-darkcard border {% if stats.unpaid_attempts > 0 %}border-sky-500/40 bg-sky-950/10{% else %}border-darkborder{% endif %} rounded-2xl p-5 shadow-lg relative overflow-hidden group">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Checkout Attempts</p>
+                    <h3 class="text-2xl font-black {% if stats.unpaid_attempts > 0 %}text-sky-400{% else %}text-white{% endif %} mt-1">{{ stats.unpaid_attempts }}</h3>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-cart-shopping"></i>
+                </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                <span class="text-slate-400">Clicked buy &amp; unpaid</span>
+                <a href="/orders?status=PENDING_PAYMENT" class="text-sky-400 hover:text-sky-300 underline font-semibold flex items-center gap-1">
+                    <span>View ({{ stats.unpaid_attempts }})</span>
+                    <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- Stock Available Card -->
+        <div class="bg-darkcard border border-darkborder rounded-2xl p-5 shadow-lg relative overflow-hidden group">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Active In-Stock</p>
+                    <h3 class="text-2xl font-black text-white mt-1">{{ stats.total_in_stock }} <span class="text-xs font-normal text-slate-400">accounts</span></h3>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                <span>Across {{ stats.total_products }} products</span>
+                <a href="/stock" class="text-blue-400 hover:underline">Manage</a>
+            </div>
+        </div>
+
+        <!-- Telegram Users Card -->
+        <div class="bg-darkcard border border-darkborder rounded-2xl p-5 shadow-lg relative overflow-hidden group">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Bot Customers</p>
+                    <h3 class="text-2xl font-black text-white mt-1">{{ stats.total_users }}</h3>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center text-xl">
+                    <i class="fa-brands fa-telegram"></i>
+                </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                <span>Holdings: <b class="text-white">${{ stats.total_user_balance }}</b> USDT</span>
+                <a href="/users" class="text-purple-400 hover:text-purple-300 font-semibold underline flex items-center gap-1">
+                    <span>Manage</span>
+                    <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Orders Table Section -->
+    <div class="bg-darkcard border border-darkborder rounded-2xl overflow-hidden shadow-xl">
+        <div class="p-5 border-b border-darkborder flex items-center justify-between">
+            <div>
+                <h3 class="font-bold text-lg text-white">Recent Orders</h3>
+                <p class="text-xs text-slate-400">Latest transactions submitted by customers via Binance Pay</p>
+            </div>
+            <a href="/orders" class="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center space-x-1">
+                <span>View All Orders</span>
+                <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </a>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-slate-900/60 text-slate-400 uppercase text-[11px] tracking-wider border-b border-darkborder">
+                    <tr>
+                        <th class="py-3 px-4">Order ID</th>
+                        <th class="py-3 px-4">Customer</th>
+                        <th class="py-3 px-4">Product</th>
+                        <th class="py-3 px-4">Amount</th>
+                        <th class="py-3 px-4">Binance TxID</th>
+                        <th class="py-3 px-4">Status</th>
+                        <th class="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-darkborder">
+                    {% for order in recent_orders %}
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="py-3.5 px-4 font-mono font-semibold text-emerald-400 text-xs">
+                            #{{ order.order_id }}
+                        </td>
+                        <td class="py-3.5 px-4 text-slate-200">
+                            {% if order.username %}
+                            <a href="https://t.me/{{ order.username }}" target="_blank" class="text-blue-400 hover:underline">@{{ order.username }}</a>
+                            {% else %}
+                            <span class="text-slate-400">ID: {{ order.telegram_id }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3.5 px-4 text-slate-200 font-medium">
+                            {{ order.product_name }}
+                            {% if order.quantity and order.quantity > 1 %}
+                            <span class="ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">x{{ order.quantity }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3.5 px-4 font-semibold text-white">
+                            ${{ order.amount }} USDT
+                        </td>
+                        <td class="py-3.5 px-4">
+                            {% if order.binance_tx_id %}
+                            <code class="bg-slate-800 px-2 py-0.5 rounded text-xs text-slate-300 font-mono select-all">{{ order.binance_tx_id }}</code>
+                            {% else %}
+                            <span class="text-slate-500 text-xs">None</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3.5 px-4">
+                            {% if order.status == 'COMPLETED' %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span> Delivered
+                            </span>
+                            {% elif order.status == 'PENDING_VERIFICATION' %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
+                                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1.5"></span> Verify TxID
+                            </span>
+                            {% elif order.status == 'PENDING_PAYMENT' %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                <span class="w-1.5 h-1.5 rounded-full bg-blue-400 mr-1.5"></span> Unpaid
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                {{ order.status }}
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3.5 px-4 text-right space-x-2">
+                            {% if order.status == 'PENDING_VERIFICATION' %}
+                            <!-- Approve & Deliver Button -->
+                            <form action="/orders/{{ order.order_id }}/approve" method="POST" class="inline">
+                                <button type="submit" title="Verify & Deliver Item" onclick="return confirm('Approve order #{{ order.order_id }} and automatically dispatch product to Telegram user?')"
+                                    class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition">
+                                    <i class="fa-solid fa-check mr-1"></i> Approve
+                                </button>
+                            </form>
+                            <!-- Reject Button -->
+                            <form action="/orders/{{ order.order_id }}/reject" method="POST" class="inline">
+                                <button type="submit" title="Reject Payment" onclick="return confirm('Reject order #{{ order.order_id }}?')"
+                                    class="px-2 py-1 bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-300 rounded-lg text-xs transition border border-slate-700">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </form>
+                            {% elif order.status == 'COMPLETED' %}
+                            <span class="text-xs text-slate-500">Delivered</span>
+                            {% else %}
+                            <span class="text-xs text-slate-500">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="py-8 text-center text-slate-500 text-sm">
+                            <i class="fa-solid fa-receipt text-3xl mb-2 text-slate-600 block"></i>
+                            No orders placed yet. Share your bot with customers to start receiving orders!
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
